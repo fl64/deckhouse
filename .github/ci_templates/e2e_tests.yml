@@ -376,7 +376,7 @@ check_e2e_labels:
 {!{- end }!}
 
     - name: Cleanup bootstrapped cluster
-      if: ${{ success() || {!{ coll.Has $ctx "manualRun" | conv.ToString | strings.Quote }!} == "false" }}
+      if: ${{ success() || '{!{ coll.Has $ctx "manualRun" | conv.ToString | }!}' == 'false' }}
       id: cleanup_cluster
       timeout-minutes: 60
       env:

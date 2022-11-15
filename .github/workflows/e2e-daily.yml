@@ -394,7 +394,7 @@ jobs:
         # </template: e2e_run_template>
 
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() || "false" == "false" }}
+        if: ${{ success() || 'false' == 'false' }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
@@ -879,7 +879,7 @@ jobs:
         # </template: e2e_run_template>
 
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() || "false" == "false" }}
+        if: ${{ success() || 'false' == 'false' }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
@@ -1362,7 +1362,7 @@ jobs:
         # </template: e2e_run_template>
 
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() || "false" == "false" }}
+        if: ${{ success() || 'false' == 'false' }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
@@ -1843,7 +1843,7 @@ jobs:
         # </template: e2e_run_template>
 
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() || "false" == "false" }}
+        if: ${{ success() || 'false' == 'false' }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
@@ -2324,7 +2324,7 @@ jobs:
         # </template: e2e_run_template>
 
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() || "false" == "false" }}
+        if: ${{ success() || 'false' == 'false' }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
@@ -2803,7 +2803,7 @@ jobs:
         # </template: e2e_run_template>
 
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() || "false" == "false" }}
+        if: ${{ success() || 'false' == 'false' }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
@@ -3282,7 +3282,7 @@ jobs:
         # </template: e2e_run_template>
 
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() || "false" == "false" }}
+        if: ${{ success() || 'false' == 'false' }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
