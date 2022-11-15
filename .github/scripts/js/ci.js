@@ -44,6 +44,7 @@ const {
   buildFailedE2eTestAdditionalInfo
 } = require("./e2e/cleanup");
 const {dispatchPullRequestCommand} = require("./pr-command-dispatcher");
+const {tryParseAbortE2eCluster} = require("./e2e/slash_workflow_command");
 
 /**
  * Update a comment in "release" issue or pull request when workflow is started.
@@ -619,10 +620,8 @@ const parseCommandArgumentAsRef = (cmdArg) => {
   if (ref) {
     return parseGitRef(ref);
   }
-  return {err: `git_ref ${cmdArg} not allowed. Only main, release-X.Y, vX.Y.Z or test-vX.Y.Z.`};
+  return {notFoundMsg: `git_ref ${cmdArg} not allowed. Only main, release-X.Y, vX.Y.Z or test-vX.Y.Z.`};
 };
-
-module.exports.parseCommandArgumentAsRef = parseCommandArgumentAsRef;
 
 /**
  * Detect slash command in the comment.
@@ -632,7 +631,6 @@ module.exports.parseCommandArgumentAsRef = parseCommandArgumentAsRef;
  *   /e2e/use/k8s/1.22
  *   /e2e/use/cri/docker
  *   /e2e/use/cri/containerd
- *   /e2e/failed/abort
  *   /deploy/web/stage v1.3.2
  *   /deploy/alpha - to deploy all editions
  *   /deploy/alpha/ce,ee,fe
@@ -653,25 +651,74 @@ const detectSlashCommand = ({ comment , context, core}) => {
   const parts = arg.argv;
   const command = parts[0];
 
-  let workflow_id = ''
-  let inputs = null;
+  // Initial ref for e2e/run with 2 args.
+  let initialRef = null
+  // A ref for workflow and a target ref for e2e release update test.
+  let targetRef = null
 
-  const cmd = dispatchPullRequestCommand({arg, context, core})
-  if(cmd) {
-    if (cmd.err) {
-      return {notFoundMsg: cmd.err}
-    }
-
-    return {
-      isE2E: true,
-      ...cmd
-    }
+  const abortRes = tryParseAbortE2eCluster({argv: arg.argv, context, core})
+  if (abortRes !== null) {
+    return abortRes
   }
 
-  // A ref for workflow and a target ref for e2e release update test.
-  let targetRef = parseCommandArgumentAsRef(parts[1])
-  if (targetRef.err) {
-    return {notFoundMsg: targetRef.err}
+
+  if (parts[1] && parts[2]) {
+    initialRef = parseCommandArgumentAsRef(parts[1])
+    targetRef = parseCommandArgumentAsRef(parts[2])
+  } else if (parts[1]) {
+    targetRef = parseCommandArgumentAsRef(parts[1])
+  }
+
+  if (initialRef && initialRef.notFoundMsg) {
+    return initialRef
+  }
+  if (targetRef && targetRef.notFoundMsg) {
+    return targetRef
+  }
+
+  let workflow_id = '';
+  let inputs = null;
+
+
+
+  // Detect /e2e/run/* commands and /e2e/use/* arguments.
+  const isE2E = Object.entries(knownLabels)
+    .some(([name, info]) => {
+      return info.type.startsWith('e2e') && command.startsWith('/'+name)
+    })
+  if (isE2E) {
+    for (const provider of knownProviders) {
+      if (command.includes(provider)) {
+        workflow_id = `e2e-${provider}.yml`;
+        break;
+      }
+    }
+
+    // Extract cri and ver from the rest lines or use defaults.
+    if (workflow_id) {
+      let ver = [];
+      let cri = [];
+      for (const line of lines) {
+        let useParts = line.split('/e2e/use/cri/');
+        if (useParts[1]) {
+          cri.push(useParts[1]);
+        }
+        useParts = line.split('/e2e/use/k8s/');
+        if (useParts[1]) {
+          ver.push(useParts[1]);
+        }
+      }
+
+      inputs = {
+        cri: cri.join(','),
+        ver: ver.join(','),
+      }
+
+      // Add initial_ref_slug input when e2e command has two args.
+      if (initialRef) {
+        inputs.initial_ref_slug = initialRef.refSlug
+      }
+    }
   }
 
   // Detect /deploy/* commands.
@@ -719,6 +766,7 @@ const detectSlashCommand = ({ comment , context, core}) => {
     inputs,
     isSuspend,
     isDeploy,
+    isE2E,
     isBuild,
   };
 };
@@ -824,11 +872,18 @@ module.exports.runSlashCommandForReleaseIssue = async ({ github, context, core }
     return core.setFailed(`Cannot start workflow: ${JSON.stringify(response)}`);
   }
 
-  const commentInfo = {
+  let commentInfo = {
     issue_id: '' + event.issue.id,
     issue_number: '' + event.issue.number,
     comment_id: '' + response.data.id,
   };
+
+  // todo remove this crutch after refact
+  if (slashCommand.isDestroyFailedE2e) {
+    commentInfo = {
+      comment_id: commentInfo.comment_id
+    }
+  }
 
   return await startWorkflow({github, context, core,
     workflow_id: slashCommand.workflow_id,

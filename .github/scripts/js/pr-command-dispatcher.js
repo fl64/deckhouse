@@ -1,4 +1,4 @@
-const {tryParseAbortE2eCluster, tryParseRunE2e} = require("./e2e/slash_workflow_command");
+const {tryParseAbortE2eCluster} = require("./e2e/slash_workflow_command");
 const {commentCommandRecognition} = require("./comments");
 const {extractCommandFromComment, reactToComment, startWorkflow} = require("./ci");
 
@@ -89,7 +89,6 @@ function dispatchPullRequestCommand({arg, core, context}){
 
   // TODO rewrite to some argv parse library
   const checks = [
-    tryParseRunE2e,
     tryParseAbortE2eCluster
   ]
 

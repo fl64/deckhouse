@@ -1,5 +1,4 @@
-const {abortFailedE2eCommand, knownLabels, knownProviders} = require("../constants");
-const {parseCommandArgumentAsRef, pullRequestInfo} = require("../ci");
+const {abortFailedE2eCommand} = require("../constants");
 
 /**
  * Build valid return object
@@ -22,12 +21,11 @@ function buildReturn(flag, workflow_id, targetRef, inputs) {
  * Try parse e2e abort arguments
  * @param {object} inputs
  * @param {object} inputs.core - A reference to the '@actions/core' package.
- * @param {object} inputs.github - A pre-authenticated octokit/rest.js client with pagination plugins.
  * @param {object} inputs.context - A reference to context https://github.com/actions/toolkit/blob/main/packages/github/src/context.ts#L6
- * @param {string} inputs.argv - array of slash command argv[0] is commnad
+ * @param {string[]} inputs.argv - array of slash command argv[0] is commnad
  * @return {object}
  */
-function tryParseAbortE2eCluster({argv, context, core, github, ref}){
+function tryParseAbortE2eCluster({argv, context, core}){
   const command = argv[0];
   if (command !== abortFailedE2eCommand) {
     return null;
@@ -61,9 +59,8 @@ function tryParseAbortE2eCluster({argv, context, core, github, ref}){
   }
 
   const prNumber = context.payload.issue.number;
-  const pull_request_ref = ref;
 
-  core.debug(`pull request info: ${JSON.stringify({prNumber, installer_image_path, pull_request_ref})}`);
+  core.debug(`pull request info: ${JSON.stringify({prNumber, installer_image_path})}`);
 
   const provider = ranForSplit[0];
   const layout = ranForSplit[1];
@@ -91,90 +88,6 @@ function tryParseAbortE2eCluster({argv, context, core, github, ref}){
 }
 
 
-/**
- * Try to parse start e2e arguments
- * @param {object} inputs
- * @param {object} inputs.core - A reference to the '@actions/core' package.
- * @param {object} inputs.github - A pre-authenticated octokit/rest.js client with pagination plugins.
- * @param {object} inputs.context - A reference to context https://github.com/actions/toolkit/blob/main/packages/github/src/context.ts#L6
- * @param {string} inputs.argv - array of slash command argv[0] is commnad
- * @param {string} inputs.ref - reference for checkout
- */
-function tryParseRunE2e({argv, context, core, github, ref}){
-  const command = argv[0];
-  // Detect /e2e/run/* commands and /e2e/use/* arguments.
-  const isE2E = Object.entries(knownLabels)
-    .some(([name, info]) => {
-      return info.type.startsWith('e2e') && command.startsWith('/'+name)
-    })
-
-  if(!isE2E) {
-    return null;
-  }
-
-  if (argv.length === 1) {
-    return {err: "Target refs is required"}
-  }
-
-  // Initial ref for e2e/run with 2 args.
-  let initialRef = null
-    // A ref for workflow and a target ref for e2e release update test.
-  let targetRef = parseCommandArgumentAsRef(argv[1])
-  if (argv.length === 3) {
-    initialRef = targetRef
-    targetRef = parseCommandArgumentAsRef(argv[2])
-  }
-
-  if(targetRef.err) {
-    return { err: targetRef.err}
-  }
-
-  if (initialRef && initialRef.err ) {
-    return { err: targetRef.err}
-  }
-
-  let workflowID = '';
-
-  for (const provider of knownProviders) {
-    if (command.includes(provider)) {
-      workflowID = `e2e-${provider}.yml`;
-      break;
-    }
-  }
-
-  if (!workflowID) {
-    return {err: `Cannot find workflow ID for command ${command}`}
-  }
-
-  // Extract cri and k8s ver from the rest lines or use defaults.
-  let ver = [];
-  let cri = [];
-  for (const line of lines) {
-    let useParts = line.split('/e2e/use/cri/');
-    if (useParts[1]) {
-      cri.push(useParts[1]);
-    }
-    useParts = line.split('/e2e/use/k8s/');
-    if (useParts[1]) {
-      ver.push(useParts[1]);
-    }
-  }
-
-  const inputs = {
-    cri: cri.join(','),
-    ver: ver.join(','),
-  }
-
-  // Add initial_ref_slug input when e2e command has two args.
-  if (initialRef) {
-    inputs.initial_ref_slug = initialRef.refSlug
-  }
-
-  return buildReturn('isE2E', workflowID, targetRef, inputs)
-}
-
-
 module.exports = {
   tryParseAbortE2eCluster,
-  tryParseRunE2e
 }
