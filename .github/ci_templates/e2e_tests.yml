@@ -353,6 +353,7 @@ check_e2e_labels:
         INITIAL_IMAGE_TAG: ${{ steps.setup.outputs.initial-image-tag }}
   {!{- tmpl.Exec "e2e_run_template" (slice .provider "run-test") | strings.Indent 6 }!}
 
+{!{- if coll.Has $ctx "manualRun" }!}
     - name: Read connection string
       if: ${{ failure() || cancelled() }}
       id: check_stay_failed_cluster
@@ -372,9 +373,10 @@ check_e2e_labels:
         github_token: ${{ secrets.BOATSWAIN_GITHUB_TOKEN }}
         number: ${{ needs.git_info.outputs.pr_number }}
         labels: "e2e/cluster/failed"
+{!{- end }!}
 
     - name: Cleanup bootstrapped cluster
-      if: ${{ success() }}
+      if: ${{ success() || {!{ coll.Has $ctx "manualRun" | conv.ToString | strings.Quote }!} == "false" }}
       id: cleanup_cluster
       timeout-minutes: 60
       env:

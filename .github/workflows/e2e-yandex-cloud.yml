@@ -474,7 +474,6 @@ jobs:
           bash /deckhouse/testing/cloud_layouts/script.sh run-test
 
         # </template: e2e_run_template>
-
       - name: Read connection string
         if: ${{ failure() || cancelled() }}
         id: check_stay_failed_cluster
@@ -496,7 +495,7 @@ jobs:
           labels: "e2e/cluster/failed"
 
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() }}
+        if: ${{ success() || "true" == "false" }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
@@ -908,7 +907,6 @@ jobs:
           bash /deckhouse/testing/cloud_layouts/script.sh run-test
 
         # </template: e2e_run_template>
-
       - name: Read connection string
         if: ${{ failure() || cancelled() }}
         id: check_stay_failed_cluster
@@ -930,7 +928,7 @@ jobs:
           labels: "e2e/cluster/failed"
 
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() }}
+        if: ${{ success() || "true" == "false" }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
@@ -1342,7 +1340,6 @@ jobs:
           bash /deckhouse/testing/cloud_layouts/script.sh run-test
 
         # </template: e2e_run_template>
-
       - name: Read connection string
         if: ${{ failure() || cancelled() }}
         id: check_stay_failed_cluster
@@ -1364,7 +1361,7 @@ jobs:
           labels: "e2e/cluster/failed"
 
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() }}
+        if: ${{ success() || "true" == "false" }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
@@ -1776,7 +1773,6 @@ jobs:
           bash /deckhouse/testing/cloud_layouts/script.sh run-test
 
         # </template: e2e_run_template>
-
       - name: Read connection string
         if: ${{ failure() || cancelled() }}
         id: check_stay_failed_cluster
@@ -1798,7 +1794,7 @@ jobs:
           labels: "e2e/cluster/failed"
 
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() }}
+        if: ${{ success() || "true" == "false" }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
@@ -2210,7 +2206,6 @@ jobs:
           bash /deckhouse/testing/cloud_layouts/script.sh run-test
 
         # </template: e2e_run_template>
-
       - name: Read connection string
         if: ${{ failure() || cancelled() }}
         id: check_stay_failed_cluster
@@ -2232,7 +2227,7 @@ jobs:
           labels: "e2e/cluster/failed"
 
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() }}
+        if: ${{ success() || "true" == "false" }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
@@ -2644,7 +2639,6 @@ jobs:
           bash /deckhouse/testing/cloud_layouts/script.sh run-test
 
         # </template: e2e_run_template>
-
       - name: Read connection string
         if: ${{ failure() || cancelled() }}
         id: check_stay_failed_cluster
@@ -2666,7 +2660,7 @@ jobs:
           labels: "e2e/cluster/failed"
 
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() }}
+        if: ${{ success() || "true" == "false" }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
@@ -3078,7 +3072,6 @@ jobs:
           bash /deckhouse/testing/cloud_layouts/script.sh run-test
 
         # </template: e2e_run_template>
-
       - name: Read connection string
         if: ${{ failure() || cancelled() }}
         id: check_stay_failed_cluster
@@ -3100,7 +3093,7 @@ jobs:
           labels: "e2e/cluster/failed"
 
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() }}
+        if: ${{ success() || "true" == "false" }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
@@ -3512,7 +3505,6 @@ jobs:
           bash /deckhouse/testing/cloud_layouts/script.sh run-test
 
         # </template: e2e_run_template>
-
       - name: Read connection string
         if: ${{ failure() || cancelled() }}
         id: check_stay_failed_cluster
@@ -3534,7 +3526,7 @@ jobs:
           labels: "e2e/cluster/failed"
 
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() }}
+        if: ${{ success() || "true" == "false" }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
@@ -3946,7 +3938,6 @@ jobs:
           bash /deckhouse/testing/cloud_layouts/script.sh run-test
 
         # </template: e2e_run_template>
-
       - name: Read connection string
         if: ${{ failure() || cancelled() }}
         id: check_stay_failed_cluster
@@ -3968,7 +3959,7 @@ jobs:
           labels: "e2e/cluster/failed"
 
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() }}
+        if: ${{ success() || "true" == "false" }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
@@ -4380,7 +4371,6 @@ jobs:
           bash /deckhouse/testing/cloud_layouts/script.sh run-test
 
         # </template: e2e_run_template>
-
       - name: Read connection string
         if: ${{ failure() || cancelled() }}
         id: check_stay_failed_cluster
@@ -4402,7 +4392,7 @@ jobs:
           labels: "e2e/cluster/failed"
 
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() }}
+        if: ${{ success() || "true" == "false" }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:

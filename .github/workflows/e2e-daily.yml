@@ -393,28 +393,8 @@ jobs:
 
         # </template: e2e_run_template>
 
-      - name: Read connection string
-        if: ${{ failure() || cancelled() }}
-        id: check_stay_failed_cluster
-        uses: actions/github-script@v5.0.0
-        env:
-          SSH_CONNECT_STR_FILE: ${{ steps.e2e_test_run.outputs.ssh_connection_str_file }}
-        with:
-          # it sets `should_run` output var if e2e/failed/stay label
-          script: |
-            const e2e_cleanup = require('./.github/scripts/js/e2e/cleanup');
-            await e2e_cleanup.readConnectionScript({core, context, github});
-
-      - name: Label pr if e2e failed
-        if: ${{ failure() || cancelled() }}
-        uses: actions-ecosystem/action-add-labels@v1
-        with:
-          github_token: ${{ secrets.BOATSWAIN_GITHUB_TOKEN }}
-          number: ${{ needs.git_info.outputs.pr_number }}
-          labels: "e2e/cluster/failed"
-
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() }}
+        if: ${{ success() || "false" == "false" }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
@@ -898,28 +878,8 @@ jobs:
 
         # </template: e2e_run_template>
 
-      - name: Read connection string
-        if: ${{ failure() || cancelled() }}
-        id: check_stay_failed_cluster
-        uses: actions/github-script@v5.0.0
-        env:
-          SSH_CONNECT_STR_FILE: ${{ steps.e2e_test_run.outputs.ssh_connection_str_file }}
-        with:
-          # it sets `should_run` output var if e2e/failed/stay label
-          script: |
-            const e2e_cleanup = require('./.github/scripts/js/e2e/cleanup');
-            await e2e_cleanup.readConnectionScript({core, context, github});
-
-      - name: Label pr if e2e failed
-        if: ${{ failure() || cancelled() }}
-        uses: actions-ecosystem/action-add-labels@v1
-        with:
-          github_token: ${{ secrets.BOATSWAIN_GITHUB_TOKEN }}
-          number: ${{ needs.git_info.outputs.pr_number }}
-          labels: "e2e/cluster/failed"
-
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() }}
+        if: ${{ success() || "false" == "false" }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
@@ -1401,28 +1361,8 @@ jobs:
 
         # </template: e2e_run_template>
 
-      - name: Read connection string
-        if: ${{ failure() || cancelled() }}
-        id: check_stay_failed_cluster
-        uses: actions/github-script@v5.0.0
-        env:
-          SSH_CONNECT_STR_FILE: ${{ steps.e2e_test_run.outputs.ssh_connection_str_file }}
-        with:
-          # it sets `should_run` output var if e2e/failed/stay label
-          script: |
-            const e2e_cleanup = require('./.github/scripts/js/e2e/cleanup');
-            await e2e_cleanup.readConnectionScript({core, context, github});
-
-      - name: Label pr if e2e failed
-        if: ${{ failure() || cancelled() }}
-        uses: actions-ecosystem/action-add-labels@v1
-        with:
-          github_token: ${{ secrets.BOATSWAIN_GITHUB_TOKEN }}
-          number: ${{ needs.git_info.outputs.pr_number }}
-          labels: "e2e/cluster/failed"
-
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() }}
+        if: ${{ success() || "false" == "false" }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
@@ -1902,28 +1842,8 @@ jobs:
 
         # </template: e2e_run_template>
 
-      - name: Read connection string
-        if: ${{ failure() || cancelled() }}
-        id: check_stay_failed_cluster
-        uses: actions/github-script@v5.0.0
-        env:
-          SSH_CONNECT_STR_FILE: ${{ steps.e2e_test_run.outputs.ssh_connection_str_file }}
-        with:
-          # it sets `should_run` output var if e2e/failed/stay label
-          script: |
-            const e2e_cleanup = require('./.github/scripts/js/e2e/cleanup');
-            await e2e_cleanup.readConnectionScript({core, context, github});
-
-      - name: Label pr if e2e failed
-        if: ${{ failure() || cancelled() }}
-        uses: actions-ecosystem/action-add-labels@v1
-        with:
-          github_token: ${{ secrets.BOATSWAIN_GITHUB_TOKEN }}
-          number: ${{ needs.git_info.outputs.pr_number }}
-          labels: "e2e/cluster/failed"
-
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() }}
+        if: ${{ success() || "false" == "false" }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
@@ -2403,28 +2323,8 @@ jobs:
 
         # </template: e2e_run_template>
 
-      - name: Read connection string
-        if: ${{ failure() || cancelled() }}
-        id: check_stay_failed_cluster
-        uses: actions/github-script@v5.0.0
-        env:
-          SSH_CONNECT_STR_FILE: ${{ steps.e2e_test_run.outputs.ssh_connection_str_file }}
-        with:
-          # it sets `should_run` output var if e2e/failed/stay label
-          script: |
-            const e2e_cleanup = require('./.github/scripts/js/e2e/cleanup');
-            await e2e_cleanup.readConnectionScript({core, context, github});
-
-      - name: Label pr if e2e failed
-        if: ${{ failure() || cancelled() }}
-        uses: actions-ecosystem/action-add-labels@v1
-        with:
-          github_token: ${{ secrets.BOATSWAIN_GITHUB_TOKEN }}
-          number: ${{ needs.git_info.outputs.pr_number }}
-          labels: "e2e/cluster/failed"
-
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() }}
+        if: ${{ success() || "false" == "false" }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
@@ -2902,28 +2802,8 @@ jobs:
 
         # </template: e2e_run_template>
 
-      - name: Read connection string
-        if: ${{ failure() || cancelled() }}
-        id: check_stay_failed_cluster
-        uses: actions/github-script@v5.0.0
-        env:
-          SSH_CONNECT_STR_FILE: ${{ steps.e2e_test_run.outputs.ssh_connection_str_file }}
-        with:
-          # it sets `should_run` output var if e2e/failed/stay label
-          script: |
-            const e2e_cleanup = require('./.github/scripts/js/e2e/cleanup');
-            await e2e_cleanup.readConnectionScript({core, context, github});
-
-      - name: Label pr if e2e failed
-        if: ${{ failure() || cancelled() }}
-        uses: actions-ecosystem/action-add-labels@v1
-        with:
-          github_token: ${{ secrets.BOATSWAIN_GITHUB_TOKEN }}
-          number: ${{ needs.git_info.outputs.pr_number }}
-          labels: "e2e/cluster/failed"
-
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() }}
+        if: ${{ success() || "false" == "false" }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
@@ -3401,28 +3281,8 @@ jobs:
 
         # </template: e2e_run_template>
 
-      - name: Read connection string
-        if: ${{ failure() || cancelled() }}
-        id: check_stay_failed_cluster
-        uses: actions/github-script@v5.0.0
-        env:
-          SSH_CONNECT_STR_FILE: ${{ steps.e2e_test_run.outputs.ssh_connection_str_file }}
-        with:
-          # it sets `should_run` output var if e2e/failed/stay label
-          script: |
-            const e2e_cleanup = require('./.github/scripts/js/e2e/cleanup');
-            await e2e_cleanup.readConnectionScript({core, context, github});
-
-      - name: Label pr if e2e failed
-        if: ${{ failure() || cancelled() }}
-        uses: actions-ecosystem/action-add-labels@v1
-        with:
-          github_token: ${{ secrets.BOATSWAIN_GITHUB_TOKEN }}
-          number: ${{ needs.git_info.outputs.pr_number }}
-          labels: "e2e/cluster/failed"
-
       - name: Cleanup bootstrapped cluster
-        if: ${{ success() }}
+        if: ${{ success() || "false" == "false" }}
         id: cleanup_cluster
         timeout-minutes: 60
         env:
