@@ -8,6 +8,7 @@ package hooks
 import (
 	"encoding/json"
 	"fmt"
+	appsv1 "k8s.io/api/apps/v1"
 
 	"github.com/flant/addon-operator/pkg/module_manager/go_hook"
 	"github.com/flant/addon-operator/pkg/module_manager/go_hook/metrics"
@@ -78,6 +79,18 @@ var _ = sdk.RegisterFunc(&go_hook.HookConfig{
 				},
 			},
 		},
+		{
+			Name:       "deployment",
+			ApiVersion: "apps/v1",
+			Kind:       "Deployment",
+			FilterFunc: applyIstioDeploymentFilter,
+		},
+		{
+			Name:       "replicaset",
+			ApiVersion: "apps/v1",
+			Kind:       "ReplicaSet",
+			FilterFunc: applyIstioReplicaSetFilter,
+		},
 	},
 }, dataplaneMetadataExporter)
 
@@ -98,6 +111,8 @@ type IstioPodInfo struct {
 	SpecificRevision string // istio.io/rev: vXxYZ label if it is
 	InjectAnnotation bool   // sidecar.istio.io/inject annotation if it is
 	InjectLabel      bool   // sidecar.istio.io/inject label if it is
+	OwnerName        string
+	OwnerKind        string
 }
 
 func (p *IstioDrivenPod) getIstioCurrentRevision() string {
@@ -156,6 +171,20 @@ func (p *IstioDrivenPod) getIstioFullVersion() string {
 	return istioVersionAbsent
 }
 
+// [<namespace>][<pod name>]exists
+type IstioPodsMap map[string]map[string]struct{}
+
+func NewIstioPodsMap() IstioPodsMap {
+	return make(IstioPodsMap)
+}
+
+func (podsMap IstioPodsMap) add(ns, name string) {
+	if _, ok := podsMap[ns]; !ok {
+		podsMap[ns] = make(map[string]struct{})
+	}
+	podsMap[ns][name] = struct{}{}
+}
+
 func applyIstioPodFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
 	pod := v1.Pod{}
 	err := sdk.FromUnstructured(obj, &pod)
@@ -163,6 +192,7 @@ func applyIstioPodFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, 
 		return nil, fmt.Errorf("cannot convert pod object to pod: %v", err)
 	}
 	istioPod := IstioDrivenPod(pod)
+	//pod.OwnerReferences
 	result := IstioPodInfo{
 		Name:             istioPod.Name,
 		Namespace:        istioPod.Namespace,
@@ -174,6 +204,46 @@ func applyIstioPodFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, 
 	}
 
 	return result, nil
+}
+
+type IstioDeploymentInfo struct {
+	Name                string
+	Namespace           string
+	AvailableForUpgrade bool
+}
+
+func applyIstioDeploymentFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
+	deploy := appsv1.Deployment{}
+	err := sdk.FromUnstructured(obj, &deploy)
+	if err != nil {
+		return nil, fmt.Errorf("cannot convert deployment object to deployment: %v", err)
+	}
+
+	return IstioDeploymentInfo{
+		Name:                deploy.Name,
+		Namespace:           deploy.Namespace,
+		AvailableForUpgrade: deploy.Status.UnavailableReplicas == 0,
+	}, nil
+}
+
+type IstioReplicaSetInfo struct {
+	Name                string
+	Namespace           string
+	AvailableForUpgrade bool
+}
+
+func applyIstioReplicaSetFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
+	rs := appsv1.ReplicaSet{}
+	err := sdk.FromUnstructured(obj, &rs)
+	if err != nil {
+		return nil, fmt.Errorf("cannot convert replicaset object to replicaset: %v", err)
+	}
+
+	return IstioDeploymentInfo{
+		Name:                rs.Name,
+		Namespace:           rs.Namespace,
+		AvailableForUpgrade: rs.Status.Replicas == rs.Status.ReadyReplicas,
+	}, nil
 }
 
 func dataplaneMetadataExporter(input *go_hook.HookInput) error {
@@ -195,6 +265,8 @@ func dataplaneMetadataExporter(input *go_hook.HookInput) error {
 			namespaceRevisionMap[nsInfo.Name] = nsInfo.Revision
 		}
 	}
+
+	istioPodsMapToUpgrade := NewIstioPodsMap()
 
 	for _, pod := range input.Snapshots["istio_pod"] {
 		istioPodInfo := pod.(IstioPodInfo)
@@ -253,6 +325,12 @@ func dataplaneMetadataExporter(input *go_hook.HookInput) error {
 			"desired_version":      desiredVersion,
 		}
 		input.MetricsCollector.Set(istioPodMetadataMetricName, 1, labels, metrics.WithGroup(metadataExporterMetricsGroup))
+		if istioPodInfo.FullVersion == desiredFullVersion {
+			istioPodsMapToUpgrade.add(istioPodInfo.Namespace, istioPodInfo.Name)
+		}
 	}
+
+	fmt.Println(istioPodsMapToUpgrade)
+
 	return nil
 }
