@@ -84,7 +84,7 @@ function tryParseAbortE2eCluster({argv, context, core}){
 
   core.debug(`e2e abort inputs: ${JSON.stringify(inputs)}`)
 
-  return buildReturn('isDestroyFailedE2e', `e2e-clean-${provider}.yml`,'refs/heads/main', inputs)
+  return buildReturn('isDestroyFailedE2e', `e2e-abort-${provider}.yml`,'refs/heads/main', inputs)
 }
 
 
