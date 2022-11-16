@@ -649,6 +649,7 @@ const detectSlashCommand = ({ comment , context, core}) => {
   }
 
   const parts = arg.argv;
+  const lines = arg.lines;
   const command = parts[0];
 
   // Initial ref for e2e/run with 2 args.
