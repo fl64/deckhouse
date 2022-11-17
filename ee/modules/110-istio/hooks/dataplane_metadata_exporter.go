@@ -183,11 +183,6 @@ type Owner struct {
 	Kind string
 }
 
-type IstioPodInfo struct {
-	DesiredFullVersion string
-	Owner              Owner
-}
-
 type IstioPodResult struct {
 	Name             string
 	Namespace        string
@@ -338,16 +333,13 @@ func dataplaneController(input *go_hook.HookInput) error {
 		}
 	}
 
-	// istioPodsMapToUpgrade[namespace][pod name]<pod info>
-	istioPodsMapToUpgrade := make(map[string]map[string]IstioPodInfo)
-
 	// istioResources[kind][namespace][name]desiredFullVersion
 	istioResources := make(map[string]map[string]map[string]string)
 
 	// istioReplicaSets[namespace][replicaset-name]owner
 	istioReplicaSets := make(map[string]map[string]Owner)
 
-	resources := make([]go_hook.FilterResult, len(input.Snapshots["deployment"])+len(input.Snapshots["statefulset"])+len(input.Snapshots["daemonset"]))
+	resources := make([]go_hook.FilterResult, 0)
 	resources = append(resources, input.Snapshots["deployment"]...)
 	resources = append(resources, input.Snapshots["statefulset"]...)
 	resources = append(resources, input.Snapshots["daemonset"]...)
@@ -449,31 +441,18 @@ func dataplaneController(input *go_hook.HookInput) error {
 
 		input.MetricsCollector.Set(istioPodMetadataMetricName, 1, labels, metrics.WithGroup(metadataExporterMetricsGroup))
 
-		// create a map of pods needed for upgrading
+		// search for resources that require a sidecar update
 		if istioPodInfo.FullVersion != desiredFullVersion {
-			if _, ok := istioPodsMapToUpgrade[istioPodInfo.Namespace]; !ok {
-				istioPodsMapToUpgrade[istioPodInfo.Namespace] = make(map[string]IstioPodInfo)
-			}
-			istioPodsMapToUpgrade[istioPodInfo.Namespace][istioPodInfo.Name] = IstioPodInfo{
-				Owner:              istioPodInfo.Owner,
-				DesiredFullVersion: desiredFullVersion,
-			}
-		}
-	}
-
-	// search for resources that require a sidecar update
-	for ns, pods := range istioPodsMapToUpgrade {
-		for _, pod := range pods {
-			switch pod.Owner.Kind {
+			switch istioPodInfo.Owner.Kind {
 			case "ReplicaSet":
-				if rs, ok := istioReplicaSets[ns][pod.Owner.Name]; ok {
-					if _, ok := istioResources[rs.Kind][ns][rs.Name]; ok {
-						istioResources[rs.Kind][ns][rs.Name] = pod.DesiredFullVersion
+				if rs, ok := istioReplicaSets[istioPodInfo.Namespace][istioPodInfo.Owner.Name]; ok {
+					if _, ok := istioResources[rs.Kind][istioPodInfo.Namespace][rs.Name]; ok {
+						istioResources[rs.Kind][istioPodInfo.Namespace][rs.Name] = desiredFullVersion
 					}
 				}
 			case "StatefulSet", "DaemonSet":
-				if _, ok := istioResources[pod.Owner.Kind][ns][pod.Owner.Name]; ok {
-					istioResources[pod.Owner.Kind][ns][pod.Owner.Name] = pod.DesiredFullVersion
+				if _, ok := istioResources[istioPodInfo.Owner.Kind][istioPodInfo.Namespace][istioPodInfo.Owner.Name]; ok {
+					istioResources[istioPodInfo.Owner.Kind][istioPodInfo.Namespace][istioPodInfo.Owner.Name] = desiredFullVersion
 				}
 			}
 		}
