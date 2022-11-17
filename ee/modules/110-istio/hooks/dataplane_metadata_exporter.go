@@ -463,8 +463,8 @@ func dataplaneController(input *go_hook.HookInput) error {
 		for namespace, resources := range namespaces {
 			for name, desiredFullVersion := range resources {
 				if desiredFullVersion != "" {
-					patch := fmt.Sprintf(patchTemplate, desiredFullVersion)
-					input.PatchCollector.MergePatch(patch, "apps/v1", kind, namespace, name)
+					input.LogEntry.Infof("Update %s \"%s\" in namespace \"%s\"", kind, name, namespace)
+					input.PatchCollector.MergePatch(fmt.Sprintf(patchTemplate, desiredFullVersion), "apps/v1", kind, namespace, name)
 				}
 			}
 		}
