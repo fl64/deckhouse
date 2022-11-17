@@ -336,9 +336,6 @@ func dataplaneController(input *go_hook.HookInput) error {
 	// istioResources[kind][namespace][name]desiredFullVersion
 	istioResources := make(map[string]map[string]map[string]string)
 
-	// istioReplicaSets[namespace][replicaset-name]owner
-	istioReplicaSets := make(map[string]map[string]Owner)
-
 	resources := make([]go_hook.FilterResult, 0)
 	resources = append(resources, input.Snapshots["deployment"]...)
 	resources = append(resources, input.Snapshots["statefulset"]...)
@@ -366,6 +363,9 @@ func dataplaneController(input *go_hook.HookInput) error {
 		}
 	}
 
+	// istioReplicaSets[namespace][replicaset-name]owner
+	istioReplicaSets := make(map[string]map[string]Owner)
+
 	// create a map of the replica sets depending on the deployments
 	for _, rs := range input.Snapshots["replicaset"] {
 		rsInfo := rs.(IstioResourceResult)
@@ -383,30 +383,30 @@ func dataplaneController(input *go_hook.HookInput) error {
 	}
 
 	for _, pod := range input.Snapshots["istio_pod"] {
-		istioPodInfo := pod.(IstioPodResult)
+		istioPod := pod.(IstioPodResult)
 
 		// sidecar.istio.io/inject=false annotation set -> ignore
-		if !istioPodInfo.InjectAnnotation {
+		if !istioPod.InjectAnnotation {
 			continue
 		}
 
 		desiredRevision := istioRevsionAbsent
 
 		// if label sidecar.istio.io/inject=true -> use global revision
-		if istioPodInfo.InjectLabel {
+		if istioPod.InjectLabel {
 			desiredRevision = globalRevision
 		}
 		// override if injection labels on namespace
-		if desiredRevisionNS, ok := istioNamespaceMap[istioPodInfo.Namespace]; ok {
+		if desiredRevisionNS, ok := istioNamespaceMap[istioPod.Namespace]; ok {
 			desiredRevision = desiredRevisionNS.Revision
 		}
 		// override if label istio.io/rev with specific revision exists
-		if istioPodInfo.SpecificRevision != "" {
-			desiredRevision = istioPodInfo.SpecificRevision
+		if istioPod.SpecificRevision != "" {
+			desiredRevision = istioPod.SpecificRevision
 		}
 
 		// we don't need metrics for pod without desired revision and without istio sidecar
-		if desiredRevision == istioRevsionAbsent && istioPodInfo.Revision == istioRevsionAbsent {
+		if desiredRevision == istioRevsionAbsent && istioPod.Revision == istioRevsionAbsent {
 			continue
 		}
 
@@ -419,21 +419,21 @@ func dataplaneController(input *go_hook.HookInput) error {
 			desiredVersion = istioVersionUnknown
 		}
 		var podVersion string
-		if istioPodInfo.FullVersion == istioVersionAbsent {
+		if istioPod.FullVersion == istioVersionAbsent {
 			podVersion = istioVersionAbsent
 		} else {
-			podVersion = versionMap.GetVersionByFullVersion(istioPodInfo.FullVersion)
+			podVersion = versionMap.GetVersionByFullVersion(istioPod.FullVersion)
 			if podVersion == "" {
 				podVersion = istioVersionUnknown
 			}
 		}
 
 		labels := map[string]string{
-			"namespace":            istioPodInfo.Namespace,
-			"dataplane_pod":        istioPodInfo.Name,
+			"namespace":            istioPod.Namespace,
+			"dataplane_pod":        istioPod.Name,
 			"desired_revision":     desiredRevision,
-			"revision":             istioPodInfo.Revision,
-			"full_version":         istioPodInfo.FullVersion,
+			"revision":             istioPod.Revision,
+			"full_version":         istioPod.FullVersion,
 			"desired_full_version": desiredFullVersion,
 			"version":              podVersion,
 			"desired_version":      desiredVersion,
@@ -442,17 +442,17 @@ func dataplaneController(input *go_hook.HookInput) error {
 		input.MetricsCollector.Set(istioPodMetadataMetricName, 1, labels, metrics.WithGroup(metadataExporterMetricsGroup))
 
 		// search for resources that require a sidecar update
-		if istioPodInfo.FullVersion != desiredFullVersion {
-			switch istioPodInfo.Owner.Kind {
+		if istioPod.FullVersion != desiredFullVersion {
+			switch istioPod.Owner.Kind {
 			case "ReplicaSet":
-				if rs, ok := istioReplicaSets[istioPodInfo.Namespace][istioPodInfo.Owner.Name]; ok {
-					if _, ok := istioResources[rs.Kind][istioPodInfo.Namespace][rs.Name]; ok {
-						istioResources[rs.Kind][istioPodInfo.Namespace][rs.Name] = desiredFullVersion
+				if rs, ok := istioReplicaSets[istioPod.Namespace][istioPod.Owner.Name]; ok {
+					if _, ok := istioResources[rs.Kind][istioPod.Namespace][rs.Name]; ok {
+						istioResources[rs.Kind][istioPod.Namespace][rs.Name] = desiredFullVersion
 					}
 				}
 			case "StatefulSet", "DaemonSet":
-				if _, ok := istioResources[istioPodInfo.Owner.Kind][istioPodInfo.Namespace][istioPodInfo.Owner.Name]; ok {
-					istioResources[istioPodInfo.Owner.Kind][istioPodInfo.Namespace][istioPodInfo.Owner.Name] = desiredFullVersion
+				if _, ok := istioResources[istioPod.Owner.Kind][istioPod.Namespace][istioPod.Owner.Name]; ok {
+					istioResources[istioPod.Owner.Kind][istioPod.Namespace][istioPod.Owner.Name] = desiredFullVersion
 				}
 			}
 		}
