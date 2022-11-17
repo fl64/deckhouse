@@ -8,11 +8,11 @@ package hooks
 import (
 	"encoding/json"
 	"fmt"
-	appsv1 "k8s.io/api/apps/v1"
 
 	"github.com/flant/addon-operator/pkg/module_manager/go_hook"
 	"github.com/flant/addon-operator/pkg/module_manager/go_hook/metrics"
 	"github.com/flant/addon-operator/sdk"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -28,18 +28,7 @@ const (
 	istioPodMetadataMetricName   = "d8_istio_dataplane_metadata"
 	metadataExporterMetricsGroup = "metadata"
 	autoUpgradeLabelName         = "istio.deckhouse.io/auto-upgrade"
-	istioVersionAnnotaionName    = "istio.deckhouse.io/version"
-	patchTemplate                = `{
-		"spec": {
-			"template": {
-				"metadata": {
-					"annotations": {
-						"%s": "%s"
-					}
-				}
-			}
-		}
-	}`
+	patchTemplate                = `{ "spec": { "template": { "metadata": { "annotations": { "istio.deckhouse.io/version": "%s" } } } } }`
 )
 
 var _ = sdk.RegisterFunc(&go_hook.HookConfig{
@@ -117,7 +106,7 @@ var _ = sdk.RegisterFunc(&go_hook.HookConfig{
 			FilterFunc: applyIstioReplicaSetFilter,
 		},
 	},
-}, dataplaneMetadataExporter)
+}, dataplaneController)
 
 type IstioNamespace struct {
 	Revision               string
@@ -197,19 +186,6 @@ type Owner struct {
 type IstioPodInfo struct {
 	DesiredFullVersion string
 	Owner              Owner
-}
-
-// IstioPodsInfoMap[namespace][pod name]<pod info>
-type IstioPodsInfoMap map[string]map[string]IstioPodInfo
-
-func (podsMap IstioPodsInfoMap) add(ns, name, ver string, owner Owner) {
-	if _, ok := podsMap[ns]; !ok {
-		podsMap[ns] = make(map[string]IstioPodInfo)
-	}
-	podsMap[ns][name] = IstioPodInfo{
-		Owner:              owner,
-		DesiredFullVersion: ver,
-	}
 }
 
 type IstioPodResult struct {
@@ -341,7 +317,7 @@ func applyIstioReplicaSetFilter(obj *unstructured.Unstructured) (go_hook.FilterR
 	return result, nil
 }
 
-func dataplaneMetadataExporter(input *go_hook.HookInput) error {
+func dataplaneController(input *go_hook.HookInput) error {
 	if !input.Values.Get("istio.internal.globalVersion").Exists() {
 		return nil
 	}
@@ -362,7 +338,8 @@ func dataplaneMetadataExporter(input *go_hook.HookInput) error {
 		}
 	}
 
-	istioPodsMapToUpgrade := make(IstioPodsInfoMap)
+	// istioPodsMapToUpgrade[namespace][pod name]<pod info>
+	istioPodsMapToUpgrade := make(map[string]map[string]IstioPodInfo)
 
 	// istioResources[kind][namespace][name]desiredFullVersion
 	istioResources := make(map[string]map[string]map[string]string)
@@ -370,7 +347,9 @@ func dataplaneMetadataExporter(input *go_hook.HookInput) error {
 	// istioReplicaSets[namespace][replicaset-name]owner
 	istioReplicaSets := make(map[string]map[string]Owner)
 
-	resources := append(input.Snapshots["deployment"], input.Snapshots["statefulset"]...)
+	resources := make([]go_hook.FilterResult, len(input.Snapshots["deployment"])+len(input.Snapshots["statefulset"])+len(input.Snapshots["daemonset"]))
+	resources = append(resources, input.Snapshots["deployment"]...)
+	resources = append(resources, input.Snapshots["statefulset"]...)
 	resources = append(resources, input.Snapshots["daemonset"]...)
 
 	for _, resRaw := range resources {
@@ -467,12 +446,22 @@ func dataplaneMetadataExporter(input *go_hook.HookInput) error {
 			"version":              podVersion,
 			"desired_version":      desiredVersion,
 		}
+
 		input.MetricsCollector.Set(istioPodMetadataMetricName, 1, labels, metrics.WithGroup(metadataExporterMetricsGroup))
+
+		// create a map of pods needed for upgrading
 		if istioPodInfo.FullVersion != desiredFullVersion {
-			istioPodsMapToUpgrade.add(istioPodInfo.Namespace, istioPodInfo.Name, desiredFullVersion, istioPodInfo.Owner)
+			if _, ok := istioPodsMapToUpgrade[istioPodInfo.Namespace]; !ok {
+				istioPodsMapToUpgrade[istioPodInfo.Namespace] = make(map[string]IstioPodInfo)
+			}
+			istioPodsMapToUpgrade[istioPodInfo.Namespace][istioPodInfo.Name] = IstioPodInfo{
+				Owner:              istioPodInfo.Owner,
+				DesiredFullVersion: desiredFullVersion,
+			}
 		}
 	}
 
+	// search for resources that require a sidecar update
 	for ns, pods := range istioPodsMapToUpgrade {
 		for _, pod := range pods {
 			switch pod.Owner.Kind {
@@ -490,11 +479,12 @@ func dataplaneMetadataExporter(input *go_hook.HookInput) error {
 		}
 	}
 
+	// update all resources that require a sidecar update
 	for kind, namespaces := range istioResources {
 		for namespace, resources := range namespaces {
 			for name, desiredFullVersion := range resources {
 				if desiredFullVersion != "" {
-					patch := fmt.Sprintf(patchTemplate, istioVersionAnnotaionName, desiredFullVersion)
+					patch := fmt.Sprintf(patchTemplate, desiredFullVersion)
 					input.PatchCollector.MergePatch(patch, "apps/v1", kind, namespace, name)
 				}
 			}

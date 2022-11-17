@@ -8,13 +8,14 @@ package hooks
 import (
 	"strings"
 
-	"github.com/deckhouse/deckhouse/ee/modules/110-istio/hooks/internal"
-	. "github.com/deckhouse/deckhouse/testing/hooks"
 	"github.com/flant/shell-operator/pkg/metric_storage/operation"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 	"k8s.io/utils/pointer"
+
+	"github.com/deckhouse/deckhouse/ee/modules/110-istio/hooks/internal"
+	. "github.com/deckhouse/deckhouse/testing/hooks"
 )
 
 const (
