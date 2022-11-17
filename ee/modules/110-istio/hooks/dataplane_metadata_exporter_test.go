@@ -684,175 +684,415 @@ var _ = Describe("Istio hooks :: dataplane_controller :: dataplane upgrade ::", 
 		GlobalRevision: true,
 	})
 
-	istioDeployYAML := generateIstioDeploymentYAML(deployParams{
-		Replicas:            2,
-		UnavailableReplicas: 0,
-		AutoUpgrade:         false,
-	})
+	Context("Test Deployment", func() {
 
-	istioRSPod0 := generateIstioPodYAML(podParams{
-		Name:            "pod-0",
-		CurrentRevision: "v1x42",
-		FullVersion:     "1.42.00",
-		OwnerName:       rsName,
-		OwnerKind:       "ReplicaSet",
-	})
-
-	istioRSPod1 := generateIstioPodYAML(podParams{
-		Name:            "pod-1",
-		CurrentRevision: "v1x42",
-		FullVersion:     "1.42.42",
-		OwnerName:       rsName,
-		OwnerKind:       "ReplicaSet",
-	})
-
-	istioRSPod2 := generateIstioPodYAML(podParams{
-		Name:            "pod-2",
-		CurrentRevision: "v1x42",
-		FullVersion:     "1.42.42",
-		OwnerName:       rsName,
-		OwnerKind:       "ReplicaSet",
-	})
-
-	istioDeployWithAutoupgradeYAML := generateIstioDeploymentYAML(deployParams{
-		Replicas:            2,
-		UnavailableReplicas: 0,
-		AutoUpgrade:         true,
-	})
-
-	istioDeployWithUnavailableYAML := generateIstioDeploymentYAML(deployParams{
-		Replicas:            2,
-		UnavailableReplicas: 1,
-		AutoUpgrade:         true,
-	})
-	//
-	//istioStsYAML := generateIstioStatefulSetYAML(stsParams{
-	//	Replicas:      2,
-	//	ReadyReplicas: 2,
-	//	AutoUpgrade:   false,
-	//})
-	//istioStsWithAutoupgradeYAML := generateIstioStatefulSetYAML(stsParams{
-	//	Replicas:      2,
-	//	ReadyReplicas: 2,
-	//	AutoUpgrade:   true,
-	//})
-	//istioStsWithAutoupgradeNotReadyYAML := generateIstioStatefulSetYAML(stsParams{
-	//	Replicas:      2,
-	//	ReadyReplicas: 1,
-	//})
-	//
-	//istioDsYAML := generateIstioDaemonSetYAML(dsParams{
-	//	NumberUnavailable: 0,
-	//	AutoUpgrade:       false,
-	//})
-	//istioDsWithAutoupgradeYAML := generateIstioDaemonSetYAML(dsParams{
-	//	NumberUnavailable: 0,
-	//	AutoUpgrade:       true,
-	//})
-	//istioDsWithAutoupgradeNotReadyYAML := generateIstioDaemonSetYAML(dsParams{
-	//	NumberUnavailable: 1,
-	//})
-
-	istioRsYAML := generateIstioReplicaSetYAML(rsParams{
-		OwnerKind: "Deployment",
-		OwnerName: deployName,
-		Replicas:  2,
-	})
-
-	Context("Deployment with auto-upgrade label has a pod with old istio version", func() {
-		BeforeEach(func() {
-			f.ValuesSet("istio.internal.globalVersion", "1.42")
-
-			clusterState := strings.Join([]string{istioNsYAML, istioDeployWithAutoupgradeYAML, istioRsYAML, istioRSPod0, istioRSPod1}, "---\n")
-			f.BindingContexts.Set(f.KubeStateSet(clusterState))
-
-			f.RunHook()
+		istioDeployYAML := generateIstioDeploymentYAML(deployParams{
+			Replicas:            2,
+			UnavailableReplicas: 0,
+			AutoUpgrade:         false,
 		})
 
-		It("Hook must execute successfully", func() {
-			Expect(f).To(ExecuteSuccessfully())
-			Expect(string(f.LogrusOutput.Contents())).To(HaveLen(0))
-
-			m := f.MetricsCollector.CollectedMetrics()
-			Expect(m).To(HaveLen(3))
-
-			d := f.KubernetesResource("Deployment", nsName, deployName)
-			Expect(d.Exists()).Should(BeTrue())
-			Expect(f.KubernetesResource("ReplicaSet", nsName, rsName).Exists()).Should(BeTrue())
-			Expect(d.Field("spec.template.metadata.annotations").String()).To(MatchJSON(`{"istio.deckhouse.io/version": "1.42.42"}`))
-		})
-	})
-
-	Context("Name space with auto-upgrade label. Deployment has a pod with old istio version", func() {
-		BeforeEach(func() {
-			f.ValuesSet("istio.internal.globalVersion", "1.42")
-
-			clusterState := strings.Join([]string{istioNsWithAutoupgradeYAML, istioDeployYAML, istioRsYAML, istioRSPod0, istioRSPod1}, "---\n")
-			f.BindingContexts.Set(f.KubeStateSet(clusterState))
-
-			f.RunHook()
+		istioDeployWithAutoupgradeYAML := generateIstioDeploymentYAML(deployParams{
+			Replicas:            2,
+			UnavailableReplicas: 0,
+			AutoUpgrade:         true,
 		})
 
-		It("Hook must execute successfully", func() {
-			Expect(f).To(ExecuteSuccessfully())
-			Expect(string(f.LogrusOutput.Contents())).To(HaveLen(0))
-
-			m := f.MetricsCollector.CollectedMetrics()
-			Expect(m).To(HaveLen(3))
-
-			d := f.KubernetesResource("Deployment", nsName, deployName)
-			Expect(d.Exists()).Should(BeTrue())
-			Expect(f.KubernetesResource("ReplicaSet", nsName, rsName).Exists()).Should(BeTrue())
-			Expect(d.Field("spec.template.metadata.annotations").String()).To(MatchJSON(`{"istio.deckhouse.io/version": "1.42.42"}`))
-		})
-	})
-
-	Context("Name space with auto-upgrade label. All deployment pods have actial istio version", func() {
-		BeforeEach(func() {
-			f.ValuesSet("istio.internal.globalVersion", "1.42")
-
-			clusterState := strings.Join([]string{istioNsWithAutoupgradeYAML, istioDeployYAML, istioRsYAML, istioRSPod1, istioRSPod2}, "---\n")
-			f.BindingContexts.Set(f.KubeStateSet(clusterState))
-
-			f.RunHook()
+		istioDeployWithUnavailableYAML := generateIstioDeploymentYAML(deployParams{
+			Replicas:            2,
+			UnavailableReplicas: 1,
+			AutoUpgrade:         true,
 		})
 
-		It("Hook must execute successfully", func() {
-			Expect(f).To(ExecuteSuccessfully())
-			Expect(string(f.LogrusOutput.Contents())).To(HaveLen(0))
-
-			m := f.MetricsCollector.CollectedMetrics()
-			Expect(m).To(HaveLen(3))
-
-			d := f.KubernetesResource("Deployment", nsName, deployName)
-			Expect(d.Exists()).Should(BeTrue())
-			Expect(f.KubernetesResource("ReplicaSet", nsName, rsName).Exists()).Should(BeTrue())
-			Expect(d.Field("spec.template").String()).To(MatchJSON(`{}`))
-		})
-	})
-
-	Context("Name space with auto-upgrade label. Deployment is not ready", func() {
-		BeforeEach(func() {
-			f.ValuesSet("istio.internal.globalVersion", "1.42")
-
-			clusterState := strings.Join([]string{istioNsWithAutoupgradeYAML, istioDeployWithUnavailableYAML, istioRsYAML, istioRSPod0, istioRSPod1}, "---\n")
-			f.BindingContexts.Set(f.KubeStateSet(clusterState))
-
-			f.RunHook()
+		istioRsYAML := generateIstioReplicaSetYAML(rsParams{
+			OwnerKind: "Deployment",
+			OwnerName: deployName,
+			Replicas:  2,
 		})
 
-		It("Hook must execute successfully", func() {
-			Expect(f).To(ExecuteSuccessfully())
-			Expect(string(f.LogrusOutput.Contents())).To(HaveLen(0))
+		istioRSPod0 := generateIstioPodYAML(podParams{
+			Name:            "pod-0",
+			CurrentRevision: "v1x42",
+			FullVersion:     "1.42.00",
+			OwnerName:       rsName,
+			OwnerKind:       "ReplicaSet",
+		})
 
-			m := f.MetricsCollector.CollectedMetrics()
-			Expect(m).To(HaveLen(3))
+		istioRSPod1 := generateIstioPodYAML(podParams{
+			Name:            "pod-1",
+			CurrentRevision: "v1x42",
+			FullVersion:     "1.42.42",
+			OwnerName:       rsName,
+			OwnerKind:       "ReplicaSet",
+		})
 
-			d := f.KubernetesResource("Deployment", nsName, deployName)
-			Expect(d.Exists()).Should(BeTrue())
-			Expect(f.KubernetesResource("ReplicaSet", nsName, rsName).Exists()).Should(BeTrue())
-			Expect(d.Field("spec.template").String()).To(MatchJSON(`{}`))
+		istioRSPod2 := generateIstioPodYAML(podParams{
+			Name:            "pod-2",
+			CurrentRevision: "v1x42",
+			FullVersion:     "1.42.42",
+			OwnerName:       rsName,
+			OwnerKind:       "ReplicaSet",
+		})
+
+		Context("Deployment with auto-upgrade label has a pod with old istio version", func() {
+			BeforeEach(func() {
+				f.ValuesSet("istio.internal.globalVersion", "1.42")
+
+				clusterState := strings.Join([]string{istioNsYAML, istioDeployWithAutoupgradeYAML, istioRsYAML, istioRSPod0, istioRSPod1}, "---\n")
+				f.BindingContexts.Set(f.KubeStateSet(clusterState))
+
+				f.RunHook()
+			})
+
+			It("Hook must execute successfully", func() {
+				Expect(f).To(ExecuteSuccessfully())
+				Expect(string(f.LogrusOutput.Contents())).To(HaveLen(0))
+
+				m := f.MetricsCollector.CollectedMetrics()
+				Expect(m).To(HaveLen(3))
+
+				d := f.KubernetesResource("Deployment", nsName, deployName)
+				Expect(d.Exists()).Should(BeTrue())
+				Expect(f.KubernetesResource("ReplicaSet", nsName, rsName).Exists()).Should(BeTrue())
+				Expect(d.Field("spec.template.metadata.annotations").String()).To(MatchJSON(`{"istio.deckhouse.io/version": "1.42.42"}`))
+			})
+		})
+
+		Context("Name space with auto-upgrade label. Deployment has a pod with old istio version", func() {
+			BeforeEach(func() {
+				f.ValuesSet("istio.internal.globalVersion", "1.42")
+
+				clusterState := strings.Join([]string{istioNsWithAutoupgradeYAML, istioDeployYAML, istioRsYAML, istioRSPod0, istioRSPod1}, "---\n")
+				f.BindingContexts.Set(f.KubeStateSet(clusterState))
+
+				f.RunHook()
+			})
+
+			It("Hook must execute successfully", func() {
+				Expect(f).To(ExecuteSuccessfully())
+				Expect(string(f.LogrusOutput.Contents())).To(HaveLen(0))
+
+				m := f.MetricsCollector.CollectedMetrics()
+				Expect(m).To(HaveLen(3))
+
+				d := f.KubernetesResource("Deployment", nsName, deployName)
+				Expect(d.Exists()).Should(BeTrue())
+				Expect(f.KubernetesResource("ReplicaSet", nsName, rsName).Exists()).Should(BeTrue())
+				Expect(d.Field("spec.template.metadata.annotations").String()).To(MatchJSON(`{"istio.deckhouse.io/version": "1.42.42"}`))
+			})
+		})
+
+		Context("Name space with auto-upgrade label. All deployment pods have actial istio version", func() {
+			BeforeEach(func() {
+				f.ValuesSet("istio.internal.globalVersion", "1.42")
+
+				clusterState := strings.Join([]string{istioNsWithAutoupgradeYAML, istioDeployYAML, istioRsYAML, istioRSPod1, istioRSPod2}, "---\n")
+				f.BindingContexts.Set(f.KubeStateSet(clusterState))
+
+				f.RunHook()
+			})
+
+			It("Hook must execute successfully", func() {
+				Expect(f).To(ExecuteSuccessfully())
+				Expect(string(f.LogrusOutput.Contents())).To(HaveLen(0))
+
+				m := f.MetricsCollector.CollectedMetrics()
+				Expect(m).To(HaveLen(3))
+
+				d := f.KubernetesResource("Deployment", nsName, deployName)
+				Expect(d.Exists()).Should(BeTrue())
+				Expect(f.KubernetesResource("ReplicaSet", nsName, rsName).Exists()).Should(BeTrue())
+				Expect(d.Field("spec.template").String()).To(MatchJSON(`{}`))
+			})
+		})
+
+		Context("Name space with auto-upgrade label. Deployment is not ready", func() {
+			BeforeEach(func() {
+				f.ValuesSet("istio.internal.globalVersion", "1.42")
+
+				clusterState := strings.Join([]string{istioNsWithAutoupgradeYAML, istioDeployWithUnavailableYAML, istioRsYAML, istioRSPod0, istioRSPod1}, "---\n")
+				f.BindingContexts.Set(f.KubeStateSet(clusterState))
+
+				f.RunHook()
+			})
+
+			It("Hook must execute successfully", func() {
+				Expect(f).To(ExecuteSuccessfully())
+				Expect(string(f.LogrusOutput.Contents())).To(HaveLen(0))
+
+				m := f.MetricsCollector.CollectedMetrics()
+				Expect(m).To(HaveLen(3))
+
+				d := f.KubernetesResource("Deployment", nsName, deployName)
+				Expect(d.Exists()).Should(BeTrue())
+				Expect(f.KubernetesResource("ReplicaSet", nsName, rsName).Exists()).Should(BeTrue())
+				Expect(d.Field("spec.template").String()).To(MatchJSON(`{}`))
+			})
 		})
 	})
 
+	Context("Test DaemonSet", func() {
+
+		istioDsYAML := generateIstioDaemonSetYAML(dsParams{
+			NumberUnavailable: 0,
+			AutoUpgrade:       false,
+		})
+		istioDsWithAutoupgradeYAML := generateIstioDaemonSetYAML(dsParams{
+			NumberUnavailable: 0,
+			AutoUpgrade:       true,
+		})
+		istioDsWithAutoupgradeNotReadyYAML := generateIstioDaemonSetYAML(dsParams{
+			NumberUnavailable: 1,
+		})
+
+		istioDsPod0 := generateIstioPodYAML(podParams{
+			Name:            "pod-0",
+			CurrentRevision: "v1x42",
+			FullVersion:     "1.42.00",
+			OwnerName:       dsName,
+			OwnerKind:       "DaemonSet",
+		})
+
+		istioDsPod1 := generateIstioPodYAML(podParams{
+			Name:            "pod-1",
+			CurrentRevision: "v1x42",
+			FullVersion:     "1.42.42",
+			OwnerName:       dsName,
+			OwnerKind:       "DaemonSet",
+		})
+
+		istioDsPod2 := generateIstioPodYAML(podParams{
+			Name:            "pod-2",
+			CurrentRevision: "v1x42",
+			FullVersion:     "1.42.42",
+			OwnerName:       dsName,
+			OwnerKind:       "DaemonSet",
+		})
+
+		Context("DaemonSet with auto-upgrade label has a pod with old istio version", func() {
+			BeforeEach(func() {
+				f.ValuesSet("istio.internal.globalVersion", "1.42")
+
+				clusterState := strings.Join([]string{istioNsYAML, istioDsWithAutoupgradeYAML, istioDsPod0, istioDsPod1}, "---\n")
+				f.BindingContexts.Set(f.KubeStateSet(clusterState))
+
+				f.RunHook()
+			})
+
+			It("Hook must execute successfully", func() {
+				Expect(f).To(ExecuteSuccessfully())
+				Expect(string(f.LogrusOutput.Contents())).To(HaveLen(0))
+
+				m := f.MetricsCollector.CollectedMetrics()
+				Expect(m).To(HaveLen(3))
+
+				d := f.KubernetesResource("DaemonSet", nsName, dsName)
+				Expect(d.Exists()).Should(BeTrue())
+				Expect(d.Field("spec.template.metadata.annotations").String()).To(MatchJSON(`{"istio.deckhouse.io/version": "1.42.42"}`))
+			})
+		})
+
+		Context("Name space with auto-upgrade label. DaemonSet has a pod with old istio version", func() {
+			BeforeEach(func() {
+				f.ValuesSet("istio.internal.globalVersion", "1.42")
+
+				clusterState := strings.Join([]string{istioNsWithAutoupgradeYAML, istioDsYAML, istioDsPod0, istioDsPod1}, "---\n")
+				f.BindingContexts.Set(f.KubeStateSet(clusterState))
+
+				f.RunHook()
+			})
+
+			It("Hook must execute successfully", func() {
+				Expect(f).To(ExecuteSuccessfully())
+				Expect(string(f.LogrusOutput.Contents())).To(HaveLen(0))
+
+				m := f.MetricsCollector.CollectedMetrics()
+				Expect(m).To(HaveLen(3))
+
+				d := f.KubernetesResource("DaemonSet", nsName, dsName)
+				Expect(d.Exists()).Should(BeTrue())
+				Expect(d.Field("spec.template.metadata.annotations").String()).To(MatchJSON(`{"istio.deckhouse.io/version": "1.42.42"}`))
+			})
+		})
+
+		Context("Name space with auto-upgrade label. All DaemonSet's pods have actial istio version", func() {
+			BeforeEach(func() {
+				f.ValuesSet("istio.internal.globalVersion", "1.42")
+
+				clusterState := strings.Join([]string{istioNsWithAutoupgradeYAML, istioDsYAML, istioDsPod1, istioDsPod2}, "---\n")
+				f.BindingContexts.Set(f.KubeStateSet(clusterState))
+
+				f.RunHook()
+			})
+
+			It("Hook must execute successfully", func() {
+				Expect(f).To(ExecuteSuccessfully())
+				Expect(string(f.LogrusOutput.Contents())).To(HaveLen(0))
+
+				m := f.MetricsCollector.CollectedMetrics()
+				Expect(m).To(HaveLen(3))
+
+				d := f.KubernetesResource("DaemonSet", nsName, dsName)
+				Expect(d.Exists()).Should(BeTrue())
+				Expect(d.Field("spec.template").String()).To(MatchJSON(`{}`))
+			})
+		})
+
+		Context("Name space with auto-upgrade label. DaemonSet is not ready", func() {
+			BeforeEach(func() {
+				f.ValuesSet("istio.internal.globalVersion", "1.42")
+
+				clusterState := strings.Join([]string{istioNsWithAutoupgradeYAML, istioDsWithAutoupgradeNotReadyYAML, istioDsPod0, istioDsPod1}, "---\n")
+				f.BindingContexts.Set(f.KubeStateSet(clusterState))
+
+				f.RunHook()
+			})
+
+			It("Hook must execute successfully", func() {
+				Expect(f).To(ExecuteSuccessfully())
+				Expect(string(f.LogrusOutput.Contents())).To(HaveLen(0))
+
+				m := f.MetricsCollector.CollectedMetrics()
+				Expect(m).To(HaveLen(3))
+
+				d := f.KubernetesResource("DaemonSet", nsName, dsName)
+				Expect(d.Exists()).Should(BeTrue())
+				Expect(d.Field("spec.template").String()).To(MatchJSON(`{}`))
+			})
+		})
+	})
+
+	Context("Testing StatefulSet", func() {
+
+		istioStsYAML := generateIstioStatefulSetYAML(stsParams{
+			Replicas:      2,
+			ReadyReplicas: 2,
+			AutoUpgrade:   false,
+		})
+		istioStsWithAutoupgradeYAML := generateIstioStatefulSetYAML(stsParams{
+			Replicas:      2,
+			ReadyReplicas: 2,
+			AutoUpgrade:   true,
+		})
+		istioStsWithAutoupgradeNotReadyYAML := generateIstioStatefulSetYAML(stsParams{
+			Replicas:      2,
+			ReadyReplicas: 1,
+		})
+
+		istioSTSPod0 := generateIstioPodYAML(podParams{
+			Name:            "pod-0",
+			CurrentRevision: "v1x42",
+			FullVersion:     "1.42.00",
+			OwnerName:       stsName,
+			OwnerKind:       "StatefulSet",
+		})
+
+		istioSTSPod1 := generateIstioPodYAML(podParams{
+			Name:            "pod-1",
+			CurrentRevision: "v1x42",
+			FullVersion:     "1.42.42",
+			OwnerName:       stsName,
+			OwnerKind:       "StatefulSet",
+		})
+
+		istioSTSPod2 := generateIstioPodYAML(podParams{
+			Name:            "pod-2",
+			CurrentRevision: "v1x42",
+			FullVersion:     "1.42.42",
+			OwnerName:       stsName,
+			OwnerKind:       "StatefulSet",
+		})
+
+		Context("DaemonSet with auto-upgrade label has a pod with old istio version", func() {
+			BeforeEach(func() {
+				f.ValuesSet("istio.internal.globalVersion", "1.42")
+
+				clusterState := strings.Join([]string{istioNsYAML, istioStsWithAutoupgradeYAML, istioSTSPod0, istioSTSPod1}, "---\n")
+				f.BindingContexts.Set(f.KubeStateSet(clusterState))
+
+				f.RunHook()
+			})
+
+			It("Hook must execute successfully", func() {
+				Expect(f).To(ExecuteSuccessfully())
+				Expect(string(f.LogrusOutput.Contents())).To(HaveLen(0))
+
+				m := f.MetricsCollector.CollectedMetrics()
+				Expect(m).To(HaveLen(3))
+
+				d := f.KubernetesResource("StatefulSet", nsName, stsName)
+				Expect(d.Exists()).Should(BeTrue())
+				Expect(d.Field("spec.template.metadata.annotations").String()).To(MatchJSON(`{"istio.deckhouse.io/version": "1.42.42"}`))
+			})
+		})
+
+		Context("Name space with auto-upgrade label. DaemonSet has a pod with old istio version", func() {
+			BeforeEach(func() {
+				f.ValuesSet("istio.internal.globalVersion", "1.42")
+
+				clusterState := strings.Join([]string{istioNsWithAutoupgradeYAML, istioStsYAML, istioSTSPod0, istioSTSPod1}, "---\n")
+				f.BindingContexts.Set(f.KubeStateSet(clusterState))
+
+				f.RunHook()
+			})
+
+			It("Hook must execute successfully", func() {
+				Expect(f).To(ExecuteSuccessfully())
+				Expect(string(f.LogrusOutput.Contents())).To(HaveLen(0))
+
+				m := f.MetricsCollector.CollectedMetrics()
+				Expect(m).To(HaveLen(3))
+
+				d := f.KubernetesResource("StatefulSet", nsName, stsName)
+				Expect(d.Exists()).Should(BeTrue())
+				Expect(d.Field("spec.template.metadata.annotations").String()).To(MatchJSON(`{"istio.deckhouse.io/version": "1.42.42"}`))
+			})
+		})
+
+		Context("Name space with auto-upgrade label. All DaemonSet's pods have actial istio version", func() {
+			BeforeEach(func() {
+				f.ValuesSet("istio.internal.globalVersion", "1.42")
+
+				clusterState := strings.Join([]string{istioNsWithAutoupgradeYAML, istioStsYAML, istioSTSPod1, istioSTSPod2}, "---\n")
+				f.BindingContexts.Set(f.KubeStateSet(clusterState))
+
+				f.RunHook()
+			})
+
+			It("Hook must execute successfully", func() {
+				Expect(f).To(ExecuteSuccessfully())
+				Expect(string(f.LogrusOutput.Contents())).To(HaveLen(0))
+
+				m := f.MetricsCollector.CollectedMetrics()
+				Expect(m).To(HaveLen(3))
+
+				d := f.KubernetesResource("StatefulSet", nsName, stsName)
+				Expect(d.Exists()).Should(BeTrue())
+				Expect(d.Field("spec.template").String()).To(MatchJSON(`{}`))
+			})
+		})
+
+		Context("Name space with auto-upgrade label. DaemonSet is not ready", func() {
+			BeforeEach(func() {
+				f.ValuesSet("istio.internal.globalVersion", "1.42")
+
+				clusterState := strings.Join([]string{istioNsWithAutoupgradeYAML, istioStsWithAutoupgradeNotReadyYAML, istioSTSPod0, istioSTSPod1}, "---\n")
+				f.BindingContexts.Set(f.KubeStateSet(clusterState))
+
+				f.RunHook()
+			})
+
+			It("Hook must execute successfully", func() {
+				Expect(f).To(ExecuteSuccessfully())
+				Expect(string(f.LogrusOutput.Contents())).To(HaveLen(0))
+
+				m := f.MetricsCollector.CollectedMetrics()
+				Expect(m).To(HaveLen(3))
+
+				d := f.KubernetesResource("StatefulSet", nsName, stsName)
+				Expect(d.Exists()).Should(BeTrue())
+				Expect(d.Field("spec.template").String()).To(MatchJSON(`{}`))
+			})
+		})
+	})
 })
