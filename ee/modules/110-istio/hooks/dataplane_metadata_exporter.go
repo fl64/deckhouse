@@ -61,7 +61,7 @@ var _ = sdk.RegisterFunc(&go_hook.HookConfig{
 			Name:       "istio_pod",
 			ApiVersion: "v1",
 			Kind:       "Pod",
-			FilterFunc: applyIstioPodFilter,
+			FilterFunc: applyIstioDrivenPodFilter,
 			LabelSelector: &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
@@ -85,7 +85,7 @@ var _ = sdk.RegisterFunc(&go_hook.HookConfig{
 			Name:       "deployment",
 			ApiVersion: "apps/v1",
 			Kind:       "Deployment",
-			FilterFunc: applyIstioDeploymentFilter,
+			FilterFunc: applyDeploymentFilter,
 			LabelSelector: &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
@@ -100,7 +100,7 @@ var _ = sdk.RegisterFunc(&go_hook.HookConfig{
 			Name:       "daemonset",
 			ApiVersion: "apps/v1",
 			Kind:       "DaemonSet",
-			FilterFunc: applyIstioDaemonSetFilter,
+			FilterFunc: applyDaemonSetFilter,
 			LabelSelector: &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
@@ -115,7 +115,7 @@ var _ = sdk.RegisterFunc(&go_hook.HookConfig{
 			Name:       "statefulset",
 			ApiVersion: "apps/v1",
 			Kind:       "StatefulSet",
-			FilterFunc: applyIstioStatefulSetFilter,
+			FilterFunc: applyStatefulSetFilter,
 			LabelSelector: &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
@@ -130,7 +130,7 @@ var _ = sdk.RegisterFunc(&go_hook.HookConfig{
 			Name:       "replicaset",
 			ApiVersion: "apps/v1",
 			Kind:       "ReplicaSet",
-			FilterFunc: applyIstioReplicaSetFilter,
+			FilterFunc: applyReplicaSetFilter,
 			LabelSelector: &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
@@ -142,10 +142,10 @@ var _ = sdk.RegisterFunc(&go_hook.HookConfig{
 			},
 		},
 	},
-}, dataplaneController)
+}, dataplaneHandler)
 
-type IstioNamespace struct {
-	Revision               string
+type IstioDrivenNamespace struct {
+	Revision               string // TODO
 	AutoUpgradeLabelExists bool
 }
 
@@ -219,7 +219,7 @@ type Owner struct {
 	Kind string
 }
 
-type IstioPodResult struct {
+type IstioDrivenPodFilterResult struct {
 	Name             string
 	Namespace        string
 	FullVersion      string // istio dataplane version (i.e. "1.15.6")
@@ -230,7 +230,7 @@ type IstioPodResult struct {
 	Owner            Owner
 }
 
-func applyIstioPodFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
+func applyIstioDrivenPodFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
 	pod := v1.Pod{}
 	err := sdk.FromUnstructured(obj, &pod)
 	if err != nil {
@@ -238,7 +238,7 @@ func applyIstioPodFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, 
 	}
 	istioPod := IstioDrivenPod(pod)
 
-	result := IstioPodResult{
+	result := IstioDrivenPodFilterResult{
 		Name:             istioPod.Name,
 		Namespace:        istioPod.Namespace,
 		FullVersion:      istioPod.getIstioFullVersion(),
@@ -255,7 +255,7 @@ func applyIstioPodFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, 
 	return result, nil
 }
 
-type IstioResourceResult struct {
+type K8SControllerFilterResult struct {
 	Name                   string
 	Kind                   string
 	Namespace              string
@@ -264,14 +264,14 @@ type IstioResourceResult struct {
 	Owner                  Owner
 }
 
-func applyIstioDeploymentFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
+func applyDeploymentFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
 	deploy := appsv1.Deployment{}
 	err := sdk.FromUnstructured(obj, &deploy)
 	if err != nil {
 		return nil, fmt.Errorf("cannot convert deployment object to deployment: %v", err)
 	}
 
-	result := IstioResourceResult{
+	result := K8SControllerFilterResult{
 		Name:                deploy.Name,
 		Kind:                deploy.Kind,
 		Namespace:           deploy.Namespace,
@@ -285,14 +285,14 @@ func applyIstioDeploymentFilter(obj *unstructured.Unstructured) (go_hook.FilterR
 	return result, nil
 }
 
-func applyIstioStatefulSetFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
+func applyStatefulSetFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
 	sts := appsv1.StatefulSet{}
 	err := sdk.FromUnstructured(obj, &sts)
 	if err != nil {
 		return nil, fmt.Errorf("cannot convert statefulset object to statefulset: %v", err)
 	}
 
-	result := IstioResourceResult{
+	result := K8SControllerFilterResult{
 		Name:                sts.Name,
 		Kind:                sts.Kind,
 		Namespace:           sts.Namespace,
@@ -306,14 +306,14 @@ func applyIstioStatefulSetFilter(obj *unstructured.Unstructured) (go_hook.Filter
 	return result, nil
 }
 
-func applyIstioDaemonSetFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
+func applyDaemonSetFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
 	ds := appsv1.DaemonSet{}
 	err := sdk.FromUnstructured(obj, &ds)
 	if err != nil {
 		return nil, fmt.Errorf("cannot convert deployment object to deployment: %v", err)
 	}
 
-	result := IstioResourceResult{
+	result := K8SControllerFilterResult{
 		Name:                ds.Name,
 		Kind:                ds.Kind,
 		Namespace:           ds.Namespace,
@@ -327,14 +327,14 @@ func applyIstioDaemonSetFilter(obj *unstructured.Unstructured) (go_hook.FilterRe
 	return result, nil
 }
 
-func applyIstioReplicaSetFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
+func applyReplicaSetFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
 	rs := appsv1.ReplicaSet{}
 	err := sdk.FromUnstructured(obj, &rs)
 	if err != nil {
 		return nil, fmt.Errorf("cannot convert replicaset object to replicaset: %v", err)
 	}
 
-	result := IstioResourceResult{
+	result := K8SControllerFilterResult{
 		Name:                rs.Name,
 		Namespace:           rs.Namespace,
 		AvailableForUpgrade: rs.Status.Replicas == rs.Status.ReadyReplicas,
@@ -348,7 +348,7 @@ func applyIstioReplicaSetFilter(obj *unstructured.Unstructured) (go_hook.FilterR
 	return result, nil
 }
 
-func dataplaneController(input *go_hook.HookInput) error {
+func dataplaneHandler(input *go_hook.HookInput) error {
 	if !input.Values.Get("istio.internal.globalVersion").Exists() {
 		return nil
 	}
@@ -359,58 +359,58 @@ func dataplaneController(input *go_hook.HookInput) error {
 
 	input.MetricsCollector.Expire(metadataExporterMetricsGroup)
 
-	istioNamespaceMap := make(map[string]IstioNamespace)
+	istioNamespaceMap := make(map[string]IstioDrivenNamespace)
 	for _, ns := range append(input.Snapshots["namespaces_definite_revision"], input.Snapshots["namespaces_global_revision"]...) {
 		nsInfo := ns.(IstioNamespaceResult)
 		if nsInfo.Revision == "global" {
-			istioNamespaceMap[nsInfo.Name] = IstioNamespace{Revision: globalRevision, AutoUpgradeLabelExists: nsInfo.AutoUpgradeLabelExists}
+			istioNamespaceMap[nsInfo.Name] = IstioDrivenNamespace{Revision: globalRevision, AutoUpgradeLabelExists: nsInfo.AutoUpgradeLabelExists}
 		} else {
-			istioNamespaceMap[nsInfo.Name] = IstioNamespace{Revision: nsInfo.Revision, AutoUpgradeLabelExists: nsInfo.AutoUpgradeLabelExists}
+			istioNamespaceMap[nsInfo.Name] = IstioDrivenNamespace{Revision: nsInfo.Revision, AutoUpgradeLabelExists: nsInfo.AutoUpgradeLabelExists}
 		}
 	}
 
-	// istioResources[kind][namespace][name]desiredFullVersion
-	istioResources := make(map[string]map[string]map[string]string)
+	// upgradeCandidates[kind][namespace][name]desiredFullVersion
+	upgradeCandidates := make(map[string]map[string]map[string]string)
 
-	resources := make([]go_hook.FilterResult, 0)
-	resources = append(resources, input.Snapshots["deployment"]...)
-	resources = append(resources, input.Snapshots["statefulset"]...)
-	resources = append(resources, input.Snapshots["daemonset"]...)
+	k8sControllers := make([]go_hook.FilterResult, 0)
+	k8sControllers = append(k8sControllers, input.Snapshots["deployment"]...)
+	k8sControllers = append(k8sControllers, input.Snapshots["statefulset"]...)
+	k8sControllers = append(k8sControllers, input.Snapshots["daemonset"]...)
 
-	for _, resRaw := range resources {
-		res := resRaw.(IstioResourceResult)
+	for _, k8sControllerRaw := range k8sControllers {
+		k8sController := k8sControllerRaw.(K8SControllerFilterResult)
 
 		// check if AutoUpgrade Label Exists on namespace
-		var NamespaceAutoUpgradeLabelExists bool
-		if deployNS, ok := istioNamespaceMap[res.Namespace]; ok {
-			NamespaceAutoUpgradeLabelExists = deployNS.AutoUpgradeLabelExists
+		var namespaceAutoUpgradeLabelExists bool
+		if k8sControllerNS, ok := istioNamespaceMap[k8sController.Namespace]; ok {
+			namespaceAutoUpgradeLabelExists = k8sControllerNS.AutoUpgradeLabelExists
 		}
 
-		// if an istio.deckhouse.io/auto-upgrade Label exists in the namespace or in the resource
-		// and the resource is available for upgrade -> add to deployments map
-		if (NamespaceAutoUpgradeLabelExists || res.AutoUpgradeLabelExists) && res.AvailableForUpgrade {
-			if _, ok := istioResources[res.Kind]; !ok {
-				istioResources[res.Kind] = make(map[string]map[string]string)
+		// if an istio.deckhouse.io/auto-upgrade Label exists in the namespace or in the controller
+		// and the controller is available for upgrade -> add to upgradeCandidates map
+		if (namespaceAutoUpgradeLabelExists || k8sController.AutoUpgradeLabelExists) && k8sController.AvailableForUpgrade {
+			if _, ok := upgradeCandidates[k8sController.Kind]; !ok {
+				upgradeCandidates[k8sController.Kind] = make(map[string]map[string]string)
 			}
-			if _, ok := istioResources[res.Namespace]; !ok {
-				istioResources[res.Kind][res.Namespace] = make(map[string]string)
+			if _, ok := upgradeCandidates[k8sController.Namespace]; !ok {
+				upgradeCandidates[k8sController.Kind][k8sController.Namespace] = make(map[string]string)
 			}
-			istioResources[res.Kind][res.Namespace][res.Name] = ""
+			upgradeCandidates[k8sController.Kind][k8sController.Namespace][k8sController.Name] = ""
 		}
 	}
 
-	// istioReplicaSets[namespace][replicaset-name]owner
-	istioReplicaSets := make(map[string]map[string]Owner)
+	// replicaSets[namespace][replicaset-name]owner
+	replicaSets := make(map[string]map[string]Owner)
 
 	// create a map of the replica sets depending on the deployments
 	for _, rs := range input.Snapshots["replicaset"] {
-		rsInfo := rs.(IstioResourceResult)
+		rsInfo := rs.(K8SControllerFilterResult)
 		if rsInfo.Owner.Kind == "Deployment" {
-			if _, ok := istioResources["Deployment"][rsInfo.Namespace][rsInfo.Owner.Name]; ok {
-				if _, ok := istioReplicaSets[rsInfo.Namespace]; !ok {
-					istioReplicaSets[rsInfo.Namespace] = make(map[string]Owner)
+			if _, ok := upgradeCandidates["Deployment"][rsInfo.Namespace][rsInfo.Owner.Name]; ok {
+				if _, ok := replicaSets[rsInfo.Namespace]; !ok {
+					replicaSets[rsInfo.Namespace] = make(map[string]Owner)
 				}
-				istioReplicaSets[rsInfo.Namespace][rsInfo.Name] = Owner{
+				replicaSets[rsInfo.Namespace][rsInfo.Name] = Owner{
 					Kind: rsInfo.Owner.Kind,
 					Name: rsInfo.Owner.Name,
 				}
@@ -419,7 +419,7 @@ func dataplaneController(input *go_hook.HookInput) error {
 	}
 
 	for _, pod := range input.Snapshots["istio_pod"] {
-		istioPod := pod.(IstioPodResult)
+		istioPod := pod.(IstioDrivenPodFilterResult)
 
 		// sidecar.istio.io/inject=false annotation set -> ignore
 		if !istioPod.InjectAnnotation {
@@ -477,26 +477,26 @@ func dataplaneController(input *go_hook.HookInput) error {
 
 		input.MetricsCollector.Set(istioPodMetadataMetricName, 1, labels, metrics.WithGroup(metadataExporterMetricsGroup))
 
-		// search for resources that require a sidecar update
+		// search for k8sControllers that require a sidecar update
 		if istioPod.FullVersion != desiredFullVersion {
 			switch istioPod.Owner.Kind {
 			case "ReplicaSet":
-				if rs, ok := istioReplicaSets[istioPod.Namespace][istioPod.Owner.Name]; ok {
-					if _, ok := istioResources[rs.Kind][istioPod.Namespace][rs.Name]; ok {
-						istioResources[rs.Kind][istioPod.Namespace][rs.Name] = desiredFullVersion
+				if rs, ok := replicaSets[istioPod.Namespace][istioPod.Owner.Name]; ok {
+					if _, ok := upgradeCandidates[rs.Kind][istioPod.Namespace][rs.Name]; ok {
+						upgradeCandidates[rs.Kind][istioPod.Namespace][rs.Name] = desiredFullVersion
 					}
 				}
 			case "StatefulSet", "DaemonSet":
-				if _, ok := istioResources[istioPod.Owner.Kind][istioPod.Namespace][istioPod.Owner.Name]; ok {
-					istioResources[istioPod.Owner.Kind][istioPod.Namespace][istioPod.Owner.Name] = desiredFullVersion
+				if _, ok := upgradeCandidates[istioPod.Owner.Kind][istioPod.Namespace][istioPod.Owner.Name]; ok {
+					upgradeCandidates[istioPod.Owner.Kind][istioPod.Namespace][istioPod.Owner.Name] = desiredFullVersion
 				}
 			}
 		}
 	}
 
-	// update all resources that require a sidecar update
+	// update all k8sControllers that require a sidecar update
 kind: // kill one resource per iteration
-	for kind, namespaces := range istioResources {
+	for kind, namespaces := range upgradeCandidates {
 		for namespace, resources := range namespaces {
 			for name, desiredFullVersion := range resources {
 				if desiredFullVersion != "" {
