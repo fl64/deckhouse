@@ -86,24 +86,60 @@ var _ = sdk.RegisterFunc(&go_hook.HookConfig{
 			ApiVersion: "apps/v1",
 			Kind:       "Deployment",
 			FilterFunc: applyIstioDeploymentFilter,
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "heritage",
+						Operator: "NotIn",
+						Values:   []string{"upmeter", "deckhouse"},
+					},
+				},
+			},
 		},
 		{
 			Name:       "daemonset",
 			ApiVersion: "apps/v1",
 			Kind:       "DaemonSet",
 			FilterFunc: applyIstioDaemonSetFilter,
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "heritage",
+						Operator: "NotIn",
+						Values:   []string{"upmeter", "deckhouse"},
+					},
+				},
+			},
 		},
 		{
 			Name:       "statefulset",
 			ApiVersion: "apps/v1",
 			Kind:       "StatefulSet",
 			FilterFunc: applyIstioStatefulSetFilter,
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "heritage",
+						Operator: "NotIn",
+						Values:   []string{"upmeter", "deckhouse"},
+					},
+				},
+			},
 		},
 		{
 			Name:       "replicaset",
 			ApiVersion: "apps/v1",
 			Kind:       "ReplicaSet",
 			FilterFunc: applyIstioReplicaSetFilter,
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "heritage",
+						Operator: "NotIn",
+						Values:   []string{"upmeter", "deckhouse"},
+					},
+				},
+			},
 		},
 	},
 }, dataplaneController)
