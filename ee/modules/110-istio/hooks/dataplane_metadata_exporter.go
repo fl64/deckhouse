@@ -27,6 +27,19 @@ const (
 	istioVersionUnknown          = "unknown"
 	istioPodMetadataMetricName   = "d8_istio_dataplane_metadata"
 	metadataExporterMetricsGroup = "metadata"
+	autoUpgradeLabelName         = "istio.deckhouse.io/auto-upgrade"
+	istioVersionAnnotaionName    = "istio.deckhouse.io/version"
+	patchTemplate                = `{
+		"spec": {
+			"template": {
+				"metadata": {
+					"annotations": {
+						"%s": "%s"
+					}
+				}
+			}
+		}
+	}`
 )
 
 var _ = sdk.RegisterFunc(&go_hook.HookConfig{
@@ -86,6 +99,18 @@ var _ = sdk.RegisterFunc(&go_hook.HookConfig{
 			FilterFunc: applyIstioDeploymentFilter,
 		},
 		{
+			Name:       "daemonset",
+			ApiVersion: "apps/v1",
+			Kind:       "DaemonSet",
+			FilterFunc: applyIstioDaemonSetFilter,
+		},
+		{
+			Name:       "statefulset",
+			ApiVersion: "apps/v1",
+			Kind:       "StatefulSet",
+			FilterFunc: applyIstioStatefulSetFilter,
+		},
+		{
 			Name:       "replicaset",
 			ApiVersion: "apps/v1",
 			Kind:       "ReplicaSet",
@@ -94,6 +119,11 @@ var _ = sdk.RegisterFunc(&go_hook.HookConfig{
 	},
 }, dataplaneMetadataExporter)
 
+type IstioNamespace struct {
+	Revision               string
+	AutoUpgradeLabelExists bool
+}
+
 // Needed to extend v1.Pod with our methods
 type IstioDrivenPod v1.Pod
 
@@ -101,18 +131,6 @@ type IstioDrivenPod v1.Pod
 type IstioPodStatus struct {
 	Revision string `json:"revision"`
 	// ... we aren't interested in the other fields
-}
-
-type IstioPodInfo struct {
-	Name             string
-	Namespace        string
-	FullVersion      string // istio dataplane version (i.e. "1.15.6")
-	Revision         string // istio dataplane revision (i.e. "v1x15")
-	SpecificRevision string // istio.io/rev: vXxYZ label if it is
-	InjectAnnotation bool   // sidecar.istio.io/inject annotation if it is
-	InjectLabel      bool   // sidecar.istio.io/inject label if it is
-	OwnerName        string
-	OwnerKind        string
 }
 
 func (p *IstioDrivenPod) getIstioCurrentRevision() string {
@@ -171,18 +189,38 @@ func (p *IstioDrivenPod) getIstioFullVersion() string {
 	return istioVersionAbsent
 }
 
-// [<namespace>][<pod name>]exists
-type IstioPodsMap map[string]map[string]struct{}
-
-func NewIstioPodsMap() IstioPodsMap {
-	return make(IstioPodsMap)
+type Owner struct {
+	Name string
+	Kind string
 }
 
-func (podsMap IstioPodsMap) add(ns, name string) {
+type IstioPodInfo struct {
+	DesiredFullVersion string
+	Owner              Owner
+}
+
+// IstioPodsInfoMap[namespace][pod name]<pod info>
+type IstioPodsInfoMap map[string]map[string]IstioPodInfo
+
+func (podsMap IstioPodsInfoMap) add(ns, name, ver string, owner Owner) {
 	if _, ok := podsMap[ns]; !ok {
-		podsMap[ns] = make(map[string]struct{})
+		podsMap[ns] = make(map[string]IstioPodInfo)
 	}
-	podsMap[ns][name] = struct{}{}
+	podsMap[ns][name] = IstioPodInfo{
+		Owner:              owner,
+		DesiredFullVersion: ver,
+	}
+}
+
+type IstioPodResult struct {
+	Name             string
+	Namespace        string
+	FullVersion      string // istio dataplane version (i.e. "1.15.6")
+	Revision         string // istio dataplane revision (i.e. "v1x15")
+	SpecificRevision string // istio.io/rev: vXxYZ label if it is
+	InjectAnnotation bool   // sidecar.istio.io/inject annotation if it is
+	InjectLabel      bool   // sidecar.istio.io/inject label if it is
+	Owner            Owner
 }
 
 func applyIstioPodFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
@@ -192,8 +230,8 @@ func applyIstioPodFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, 
 		return nil, fmt.Errorf("cannot convert pod object to pod: %v", err)
 	}
 	istioPod := IstioDrivenPod(pod)
-	//pod.OwnerReferences
-	result := IstioPodInfo{
+
+	result := IstioPodResult{
 		Name:             istioPod.Name,
 		Namespace:        istioPod.Namespace,
 		FullVersion:      istioPod.getIstioFullVersion(),
@@ -203,13 +241,20 @@ func applyIstioPodFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, 
 		InjectLabel:      istioPod.injectLabel(),
 	}
 
+	if len(pod.OwnerReferences) == 1 {
+		result.Owner.Name = pod.OwnerReferences[0].Name
+		result.Owner.Kind = pod.OwnerReferences[0].Kind
+	}
 	return result, nil
 }
 
-type IstioDeploymentInfo struct {
-	Name                string
-	Namespace           string
-	AvailableForUpgrade bool
+type IstioResourceResult struct {
+	Name                   string
+	Kind                   string
+	Namespace              string
+	AvailableForUpgrade    bool
+	AutoUpgradeLabelExists bool
+	Owner                  Owner
 }
 
 func applyIstioDeploymentFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
@@ -219,17 +264,60 @@ func applyIstioDeploymentFilter(obj *unstructured.Unstructured) (go_hook.FilterR
 		return nil, fmt.Errorf("cannot convert deployment object to deployment: %v", err)
 	}
 
-	return IstioDeploymentInfo{
+	result := IstioResourceResult{
 		Name:                deploy.Name,
+		Kind:                deploy.Kind,
 		Namespace:           deploy.Namespace,
 		AvailableForUpgrade: deploy.Status.UnavailableReplicas == 0,
-	}, nil
+	}
+
+	if _, ok := deploy.Labels[autoUpgradeLabelName]; ok {
+		result.AutoUpgradeLabelExists = deploy.Labels[autoUpgradeLabelName] == "true"
+	}
+
+	return result, nil
 }
 
-type IstioReplicaSetInfo struct {
-	Name                string
-	Namespace           string
-	AvailableForUpgrade bool
+func applyIstioStatefulSetFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
+	sts := appsv1.StatefulSet{}
+	err := sdk.FromUnstructured(obj, &sts)
+	if err != nil {
+		return nil, fmt.Errorf("cannot convert statefulset object to statefulset: %v", err)
+	}
+
+	result := IstioResourceResult{
+		Name:                sts.Name,
+		Kind:                sts.Kind,
+		Namespace:           sts.Namespace,
+		AvailableForUpgrade: sts.Status.Replicas == sts.Status.ReadyReplicas,
+	}
+
+	if _, ok := sts.Labels[autoUpgradeLabelName]; ok {
+		result.AutoUpgradeLabelExists = sts.Labels[autoUpgradeLabelName] == "true"
+	}
+
+	return result, nil
+}
+
+func applyIstioDaemonSetFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
+	ds := appsv1.DaemonSet{}
+	err := sdk.FromUnstructured(obj, &ds)
+	if err != nil {
+		return nil, fmt.Errorf("cannot convert deployment object to deployment: %v", err)
+	}
+
+	result := IstioResourceResult{
+		Name:                ds.Name,
+		Kind:                ds.Kind,
+		Namespace:           ds.Namespace,
+		AvailableForUpgrade: ds.Status.NumberUnavailable == 0,
+	}
+
+	if _, ok := ds.Labels[autoUpgradeLabelName]; ok {
+		result.AutoUpgradeLabelExists = ds.Labels[autoUpgradeLabelName] == "true"
+	}
+
+	return result, nil
 }
 
 func applyIstioReplicaSetFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
@@ -239,11 +327,18 @@ func applyIstioReplicaSetFilter(obj *unstructured.Unstructured) (go_hook.FilterR
 		return nil, fmt.Errorf("cannot convert replicaset object to replicaset: %v", err)
 	}
 
-	return IstioDeploymentInfo{
+	result := IstioResourceResult{
 		Name:                rs.Name,
 		Namespace:           rs.Namespace,
 		AvailableForUpgrade: rs.Status.Replicas == rs.Status.ReadyReplicas,
-	}, nil
+	}
+
+	if len(rs.OwnerReferences) == 1 {
+		result.Owner.Name = rs.OwnerReferences[0].Name
+		result.Owner.Kind = rs.OwnerReferences[0].Kind
+	}
+
+	return result, nil
 }
 
 func dataplaneMetadataExporter(input *go_hook.HookInput) error {
@@ -252,24 +347,72 @@ func dataplaneMetadataExporter(input *go_hook.HookInput) error {
 	}
 
 	versionMap := istio_versions.VersionMapJSONToVersionMap(input.Values.Get("istio.internal.versionMap").String())
+
 	globalRevision := versionMap[input.Values.Get("istio.internal.globalVersion").String()].Revision
 
 	input.MetricsCollector.Expire(metadataExporterMetricsGroup)
 
-	var namespaceRevisionMap = map[string]string{}
+	istioNamespaceMap := make(map[string]IstioNamespace)
 	for _, ns := range append(input.Snapshots["namespaces_definite_revision"], input.Snapshots["namespaces_global_revision"]...) {
-		nsInfo := ns.(NamespaceInfo)
+		nsInfo := ns.(IstioNamespaceResult)
 		if nsInfo.Revision == "global" {
-			namespaceRevisionMap[nsInfo.Name] = globalRevision
+			istioNamespaceMap[nsInfo.Name] = IstioNamespace{Revision: globalRevision, AutoUpgradeLabelExists: nsInfo.AutoUpgradeLabelExists}
 		} else {
-			namespaceRevisionMap[nsInfo.Name] = nsInfo.Revision
+			istioNamespaceMap[nsInfo.Name] = IstioNamespace{Revision: nsInfo.Revision, AutoUpgradeLabelExists: nsInfo.AutoUpgradeLabelExists}
 		}
 	}
 
-	istioPodsMapToUpgrade := NewIstioPodsMap()
+	istioPodsMapToUpgrade := make(IstioPodsInfoMap)
+
+	// istioResources[kind][namespace][name]desiredFullVersion
+	istioResources := make(map[string]map[string]map[string]string)
+
+	// istioReplicaSets[namespace][replicaset-name]owner
+	istioReplicaSets := make(map[string]map[string]Owner)
+
+	resources := append(input.Snapshots["deployment"], input.Snapshots["statefulset"]...)
+	resources = append(resources, input.Snapshots["daemonset"]...)
+
+	for _, resRaw := range resources {
+		res := resRaw.(IstioResourceResult)
+
+		// check if AutoUpgrade Label Exists on namespace
+		var NamespaceAutoUpgradeLabelExists bool
+		if deployNS, ok := istioNamespaceMap[res.Namespace]; ok {
+			NamespaceAutoUpgradeLabelExists = deployNS.AutoUpgradeLabelExists
+		}
+
+		// if an istio.deckhouse.io/auto-upgrade Label exists in the namespace or in the deployment
+		// and the resource is available for upgrade -> add to deployments map
+		if (NamespaceAutoUpgradeLabelExists || res.AutoUpgradeLabelExists) && res.AvailableForUpgrade {
+			if _, ok := istioResources[res.Kind]; !ok {
+				istioResources[res.Kind] = make(map[string]map[string]string)
+			}
+			if _, ok := istioResources[res.Namespace]; !ok {
+				istioResources[res.Kind][res.Namespace] = make(map[string]string)
+			}
+			istioResources[res.Kind][res.Namespace][res.Name] = ""
+		}
+	}
+
+	// create a map of the replica sets depending on the deployments
+	for _, rs := range input.Snapshots["replicaset"] {
+		rsInfo := rs.(IstioResourceResult)
+		if rsInfo.Owner.Kind == "Deployment" {
+			if _, ok := istioResources["Deployment"][rsInfo.Namespace][rsInfo.Owner.Name]; ok {
+				if _, ok := istioReplicaSets[rsInfo.Namespace]; !ok {
+					istioReplicaSets[rsInfo.Namespace] = make(map[string]Owner)
+				}
+				istioReplicaSets[rsInfo.Namespace][rsInfo.Name] = Owner{
+					Kind: rsInfo.Owner.Kind,
+					Name: rsInfo.Owner.Name,
+				}
+			}
+		}
+	}
 
 	for _, pod := range input.Snapshots["istio_pod"] {
-		istioPodInfo := pod.(IstioPodInfo)
+		istioPodInfo := pod.(IstioPodResult)
 
 		// sidecar.istio.io/inject=false annotation set -> ignore
 		if !istioPodInfo.InjectAnnotation {
@@ -283,8 +426,8 @@ func dataplaneMetadataExporter(input *go_hook.HookInput) error {
 			desiredRevision = globalRevision
 		}
 		// override if injection labels on namespace
-		if desiredRevisionNS, ok := namespaceRevisionMap[istioPodInfo.Namespace]; ok {
-			desiredRevision = desiredRevisionNS
+		if desiredRevisionNS, ok := istioNamespaceMap[istioPodInfo.Namespace]; ok {
+			desiredRevision = desiredRevisionNS.Revision
 		}
 		// override if label istio.io/rev with specific revision exists
 		if istioPodInfo.SpecificRevision != "" {
@@ -325,12 +468,38 @@ func dataplaneMetadataExporter(input *go_hook.HookInput) error {
 			"desired_version":      desiredVersion,
 		}
 		input.MetricsCollector.Set(istioPodMetadataMetricName, 1, labels, metrics.WithGroup(metadataExporterMetricsGroup))
-		if istioPodInfo.FullVersion == desiredFullVersion {
-			istioPodsMapToUpgrade.add(istioPodInfo.Namespace, istioPodInfo.Name)
+		if istioPodInfo.FullVersion != desiredFullVersion {
+			istioPodsMapToUpgrade.add(istioPodInfo.Namespace, istioPodInfo.Name, desiredFullVersion, istioPodInfo.Owner)
 		}
 	}
 
-	fmt.Println(istioPodsMapToUpgrade)
+	for ns, pods := range istioPodsMapToUpgrade {
+		for _, pod := range pods {
+			switch pod.Owner.Kind {
+			case "ReplicaSet":
+				if rs, ok := istioReplicaSets[ns][pod.Owner.Name]; ok {
+					if _, ok := istioResources[rs.Kind][ns][rs.Name]; ok {
+						istioResources[rs.Kind][ns][rs.Name] = pod.DesiredFullVersion
+					}
+				}
+			case "StatefulSet", "DaemonSet":
+				if _, ok := istioResources[pod.Owner.Kind][ns][pod.Owner.Name]; ok {
+					istioResources[pod.Owner.Kind][ns][pod.Owner.Name] = pod.DesiredFullVersion
+				}
+			}
+		}
+	}
+
+	for kind, namespaces := range istioResources {
+		for namespace, resources := range namespaces {
+			for name, desiredFullVersion := range resources {
+				if desiredFullVersion != "" {
+					patch := fmt.Sprintf(patchTemplate, istioVersionAnnotaionName, desiredFullVersion)
+					input.PatchCollector.MergePatch(patch, "apps/v1", kind, namespace, name)
+				}
+			}
+		}
+	}
 
 	return nil
 }
