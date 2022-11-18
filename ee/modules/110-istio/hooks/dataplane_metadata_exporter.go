@@ -350,7 +350,7 @@ func dataplaneController(input *go_hook.HookInput) error {
 			NamespaceAutoUpgradeLabelExists = deployNS.AutoUpgradeLabelExists
 		}
 
-		// if an istio.deckhouse.io/auto-upgrade Label exists in the namespace or in the deployment
+		// if an istio.deckhouse.io/auto-upgrade Label exists in the namespace or in the resource
 		// and the resource is available for upgrade -> add to deployments map
 		if (NamespaceAutoUpgradeLabelExists || res.AutoUpgradeLabelExists) && res.AvailableForUpgrade {
 			if _, ok := istioResources[res.Kind]; !ok {

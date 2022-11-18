@@ -749,7 +749,7 @@ var _ = Describe("Istio hooks :: dataplane_controller :: dataplane upgrade ::", 
 				Expect(f).To(ExecuteSuccessfully())
 
 				Expect(strings.Split(strings.Trim(string(f.LogrusOutput.Contents()), "\n"), "\n")).To(HaveLen(1))
-				Expect(string(f.LogrusOutput.Contents())).To(ContainSubstring("Update Deployment"))
+				Expect(string(f.LogrusOutput.Contents())).To(ContainSubstring("Patch Deployment"))
 
 				m := f.MetricsCollector.CollectedMetrics()
 				Expect(m).To(HaveLen(3))
@@ -775,7 +775,7 @@ var _ = Describe("Istio hooks :: dataplane_controller :: dataplane upgrade ::", 
 				Expect(f).To(ExecuteSuccessfully())
 
 				Expect(strings.Split(strings.Trim(string(f.LogrusOutput.Contents()), "\n"), "\n")).To(HaveLen(1))
-				Expect(string(f.LogrusOutput.Contents())).To(ContainSubstring("Update Deployment"))
+				Expect(string(f.LogrusOutput.Contents())).To(ContainSubstring("Patch Deployment"))
 
 				m := f.MetricsCollector.CollectedMetrics()
 				Expect(m).To(HaveLen(3))
@@ -890,7 +890,7 @@ var _ = Describe("Istio hooks :: dataplane_controller :: dataplane upgrade ::", 
 				Expect(f).To(ExecuteSuccessfully())
 
 				Expect(strings.Split(strings.Trim(string(f.LogrusOutput.Contents()), "\n"), "\n")).To(HaveLen(1))
-				Expect(string(f.LogrusOutput.Contents())).To(ContainSubstring("Update DaemonSet"))
+				Expect(string(f.LogrusOutput.Contents())).To(ContainSubstring("Patch DaemonSet"))
 
 				m := f.MetricsCollector.CollectedMetrics()
 				Expect(m).To(HaveLen(3))
@@ -915,7 +915,7 @@ var _ = Describe("Istio hooks :: dataplane_controller :: dataplane upgrade ::", 
 				Expect(f).To(ExecuteSuccessfully())
 
 				Expect(strings.Split(strings.Trim(string(f.LogrusOutput.Contents()), "\n"), "\n")).To(HaveLen(1))
-				Expect(string(f.LogrusOutput.Contents())).To(ContainSubstring("Update DaemonSet"))
+				Expect(string(f.LogrusOutput.Contents())).To(ContainSubstring("Patch DaemonSet"))
 
 				m := f.MetricsCollector.CollectedMetrics()
 				Expect(m).To(HaveLen(3))
@@ -1028,7 +1028,7 @@ var _ = Describe("Istio hooks :: dataplane_controller :: dataplane upgrade ::", 
 				Expect(f).To(ExecuteSuccessfully())
 
 				Expect(strings.Split(strings.Trim(string(f.LogrusOutput.Contents()), "\n"), "\n")).To(HaveLen(1))
-				Expect(string(f.LogrusOutput.Contents())).To(ContainSubstring("Update StatefulSet"))
+				Expect(string(f.LogrusOutput.Contents())).To(ContainSubstring("Patch StatefulSet"))
 
 				m := f.MetricsCollector.CollectedMetrics()
 				Expect(m).To(HaveLen(3))
@@ -1053,7 +1053,7 @@ var _ = Describe("Istio hooks :: dataplane_controller :: dataplane upgrade ::", 
 				Expect(f).To(ExecuteSuccessfully())
 
 				Expect(strings.Split(strings.Trim(string(f.LogrusOutput.Contents()), "\n"), "\n")).To(HaveLen(1))
-				Expect(string(f.LogrusOutput.Contents())).To(ContainSubstring("Update StatefulSet"))
+				Expect(string(f.LogrusOutput.Contents())).To(ContainSubstring("Patch StatefulSet"))
 
 				m := f.MetricsCollector.CollectedMetrics()
 				Expect(m).To(HaveLen(3))
