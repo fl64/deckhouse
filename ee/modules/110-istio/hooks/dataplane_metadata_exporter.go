@@ -32,7 +32,7 @@ const (
 )
 
 var _ = sdk.RegisterFunc(&go_hook.HookConfig{
-	Queue: internal.Queue("dataplane-metadata"),
+	Queue: internal.Queue("dataplane-controller"),
 	Kubernetes: []go_hook.KubernetesConfig{
 		{
 			Name:       "namespaces_global_revision",
@@ -459,12 +459,14 @@ func dataplaneController(input *go_hook.HookInput) error {
 	}
 
 	// update all resources that require a sidecar update
+kind: // kill one resource per iteration
 	for kind, namespaces := range istioResources {
 		for namespace, resources := range namespaces {
 			for name, desiredFullVersion := range resources {
 				if desiredFullVersion != "" {
-					input.LogEntry.Infof("Update %s \"%s\" in namespace \"%s\"", kind, name, namespace)
+					input.LogEntry.Infof("Patch %s '%s' in namespace '%s' with full version '%s'", kind, name, namespace, desiredFullVersion)
 					input.PatchCollector.MergePatch(fmt.Sprintf(patchTemplate, desiredFullVersion), "apps/v1", kind, namespace, name)
+					break kind
 				}
 			}
 		}
