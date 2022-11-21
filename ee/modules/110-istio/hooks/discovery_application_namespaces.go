@@ -20,8 +20,9 @@ import (
 type IstioNamespaceFilterResult struct {
 	Name                    string
 	DeletionTimestampExists bool
-	Revision                string // for dataplane_metadata_exporter.go
-	AutoUpgradeLabelExists  bool   // for dataplane_metadata_exporter.go
+	RevisionRaw             string // for dataplane_metadata_exporter.go
+	Revision                string
+	AutoUpgradeLabelExists  bool // for dataplane_metadata_exporter.go
 }
 
 func applyNamespaceFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
@@ -37,9 +38,9 @@ func applyNamespaceFilter(obj *unstructured.Unstructured) (go_hook.FilterResult,
 	}
 
 	if revision, ok := obj.GetLabels()["istio.io/rev"]; ok {
-		namespaceInfo.Revision = revision
+		namespaceInfo.RevisionRaw = revision
 	} else {
-		namespaceInfo.Revision = "global"
+		namespaceInfo.RevisionRaw = "global"
 	}
 
 	return namespaceInfo, nil
