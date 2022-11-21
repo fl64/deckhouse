@@ -366,7 +366,7 @@ func dataplaneHandler(input *go_hook.HookInput) error {
 
 	istioNamespaceMap := make(map[string]IstioDrivenNamespace)
 	for _, ns := range append(input.Snapshots["namespaces_definite_revision"], input.Snapshots["namespaces_global_revision"]...) {
-		nsInfo := ns.(IstioNamespaceResult)
+		nsInfo := ns.(IstioNamespaceFilterResult)
 		if nsInfo.Revision == "global" {
 			istioNamespaceMap[nsInfo.Name] = IstioDrivenNamespace{Revision: globalRevision, AutoUpgradeLabelExists: nsInfo.AutoUpgradeLabelExists}
 		} else {

@@ -17,7 +17,7 @@ import (
 	"github.com/deckhouse/deckhouse/ee/modules/110-istio/hooks/internal"
 )
 
-type IstioNamespaceResult struct {
+type IstioNamespaceFilterResult struct {
 	Name                    string
 	DeletionTimestampExists bool
 	Revision                string // for dataplane_metadata_exporter.go
@@ -27,7 +27,7 @@ type IstioNamespaceResult struct {
 func applyNamespaceFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
 	_, deletionTimestampExists := obj.GetAnnotations()["deletionTimestamp"]
 
-	var namespaceInfo = IstioNamespaceResult{
+	var namespaceInfo = IstioNamespaceFilterResult{
 		Name:                    obj.GetName(),
 		DeletionTimestampExists: deletionTimestampExists,
 	}
@@ -46,7 +46,7 @@ func applyNamespaceFilter(obj *unstructured.Unstructured) (go_hook.FilterResult,
 }
 
 func applyDiscoveryAppIstioPodFilter(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
-	var namespaceInfo = IstioNamespaceResult{
+	var namespaceInfo = IstioNamespaceFilterResult{
 		Name: obj.GetNamespace(),
 	}
 	return namespaceInfo, nil
@@ -135,7 +135,7 @@ func applicationNamespacesDiscovery(input *go_hook.HookInput) error {
 	namespaces = append(namespaces, input.Snapshots["istio_pod_global_rev"]...)
 	namespaces = append(namespaces, input.Snapshots["istio_pod_definite_rev"]...)
 	for _, ns := range namespaces {
-		nsInfo := ns.(IstioNamespaceResult)
+		nsInfo := ns.(IstioNamespaceFilterResult)
 		if nsInfo.DeletionTimestampExists {
 			continue
 		}
