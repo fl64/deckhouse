@@ -374,7 +374,7 @@ func dataplaneHandler(input *go_hook.HookInput) error {
 		}
 	}
 
-	// upgradeCandidates[kind][namespace][name]desiredFullVersion
+	// upgradeCandidates[kind][namespace][name]candidateInfo{}
 	upgradeCandidates := make(map[string]map[string]map[string]candidateInfo)
 
 	k8sControllers := make([]go_hook.FilterResult, 0)
@@ -407,7 +407,7 @@ func dataplaneHandler(input *go_hook.HookInput) error {
 	// replicaSets[namespace][replicaset-name]owner
 	replicaSets := make(map[string]map[string]Owner)
 
-	// create a map of the replica sets depending on the deployments
+	// create a map of the replica sets depending on the deployments from upgradeCandidates map
 	for _, rs := range input.Snapshots["replicaset"] {
 		rsInfo := rs.(K8SControllerFilterResult)
 		if rsInfo.Owner.Kind == "Deployment" {
@@ -505,7 +505,7 @@ func dataplaneHandler(input *go_hook.HookInput) error {
 		}
 	}
 
-	// update all k8sControllers that require a sidecar update
+	// update all candidates to update that require a sidecar update
 kind: // kill one resource per iteration
 	for kind, namespaces := range upgradeCandidates {
 		for namespace, resources := range namespaces {
