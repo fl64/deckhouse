@@ -1,0 +1,38 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: xxxxx.deckhouse.io
+  labels:
+    heritage: deckhouse
+    module: admission-policy-engine
+spec:
+  group: deckhouse.io
+  scope: Cluster
+  names:
+    plural: xxxxxs
+    singular: xxxxx
+    kind: XXXXX
+  preserveUnknownFields: false
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: ["spec"]
+          description: |
+            TODO
+          properties:
+            spec:
+              type: object
+              properties:
+                match:
+                  type: object
+                  properties:
+                    namespaces:
+                      type: array
+                      items:
+                        type: string
+
+
