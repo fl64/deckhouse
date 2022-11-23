@@ -1,13 +1,11 @@
 {{- $context := . }}
 
 ---
-{{- if .Values.admissionPolicyEngine.internal.bootstrapped }}
-    {{- range $cr := .Values.admissionPolicyEngine.internal.operationPolicies }}
-      {{- if gt (len $cr.spec.policies.allowedRepos) 0 }}
-        {{- include "allowed_repos_policy" (list $context $cr) }}
-      {{- end }}
-    {{- end }}}
-{{- end }}
+{{- range $cr := .Values.admissionPolicyEngine.internal.operationPolicies }}
+  {{- if gt (len $cr.spec.policies.allowedRepos) 0 }}
+    {{- include "allowed_repos_policy" (list $context $cr) }}
+  {{- end }}
+{{- end }}}
 
 
 

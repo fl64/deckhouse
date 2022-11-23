@@ -17,6 +17,9 @@ limitations under the License.
 package hooks
 
 import (
+	"fmt"
+	"time"
+
 	v1alpha1 "github.com/deckhouse/deckhouse/modules/015-admission-policy-engine/hooks/internal/apis"
 
 	"github.com/flant/addon-operator/pkg/module_manager/go_hook"
@@ -26,8 +29,14 @@ import (
 )
 
 var _ = sdk.RegisterFunc(&go_hook.HookConfig{
-	OnAfterHelm: &go_hook.OrderedConfig{Order: 30},
+	Queue: "/modules/admission-policy-engine/operation_policies",
 	Kubernetes: []go_hook.KubernetesConfig{
+		{
+			Name:       "templates",
+			ApiVersion: "templates.gatekeeper.sh/v1",
+			Kind:       "ConstraintTemplate",
+			FilterFunc: filterTemplates,
+		},
 		{
 			Name:       "operation-policies",
 			ApiVersion: "deckhouse.io/v1alpha1",
@@ -35,20 +44,40 @@ var _ = sdk.RegisterFunc(&go_hook.HookConfig{
 			FilterFunc: filterOP,
 		},
 	},
+	Settings: &go_hook.HookConfigSettings{
+		ExecutionMinInterval: 3 * time.Second,
+		ExecutionBurst:       5,
+	},
 }, handleOP)
 
 func handleOP(input *go_hook.HookInput) error {
-	snap := input.Snapshots["operation-policies"]
+	result := make([]*operationPolicy, 0)
 
-	result := make([]*operationPolicy, 0, len(snap))
+	bootstrapped := input.Values.Get("admissionPolicyEngine.internal.bootstrapped").Bool()
+	if !bootstrapped {
+		return nil
+	}
 
-	// if len(snap) == 0 {
-	// 	input.Values.Set("admissionPolicyEngine.internal.operationPolicies",result )
-	// 	return nil
-	// }
+	snap := input.Snapshots["templates"]
+	if len(snap) == 0 {
+		input.Values.Set("admissionPolicyEngine.internal.operationPolicies", result)
+		return nil
+	}
+
+	kindMap := make(map[string]struct{}, len(snap))
+	for _, sn := range snap {
+		kind := sn.(string)
+		kindMap[kind] = struct{}{}
+	}
+
+	snap = input.Snapshots["operation-policies"]
 
 	for _, sn := range snap {
 		op := sn.(*operationPolicy)
+		if _, ok := kindMap[op.Kind]; !ok {
+			// skip constraint if crd was not created by gatekeeper yet
+			continue
+		}
 		result = append(result, op)
 	}
 
@@ -68,7 +97,20 @@ func filterOP(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
 	return &op, nil
 }
 
+func filterTemplates(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
+	kind, found, err := unstructured.NestedString(obj.Object, "spec", "crd", "spec", "names", "kind")
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("kind for ConstraintTemplate: %s not found", obj.GetName())
+	}
+
+	return kind, nil
+}
+
 type operationPolicy struct {
+	Kind     string `json:"kind"`
 	Metadata struct {
 		Name string `json:"name"`
 	} `json:"metadata"`
