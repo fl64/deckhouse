@@ -1,7 +1,7 @@
 apiVersion: templates.gatekeeper.sh/v1
 kind: ConstraintTemplate
 metadata:
-  name: k8sallowedrepos
+  name: d8allowedrepos
   annotations:
     metadata.gatekeeper.sh/title: "Allowed Repositories"
     metadata.gatekeeper.sh/version: 1.0.0
@@ -11,9 +11,8 @@ spec:
   crd:
     spec:
       names:
-        kind: K8sAllowedRepos
+        kind: D8AllowedRepos
       validation:
-        # Schema for the `parameters` field
         openAPIV3Schema:
           type: object
           properties:

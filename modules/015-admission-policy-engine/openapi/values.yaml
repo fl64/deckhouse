@@ -36,3 +36,9 @@ properties:
               type: array
               items:
                 type: string
+      operationPolicies:
+        type: array
+        default: []
+        items:
+          type: object
+          additionalProperties: true

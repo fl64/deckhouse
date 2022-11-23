@@ -1,0 +1,46 @@
+{{- if $.Values.admissionPolicyEngine.internal.bootstrapped }}
+  {{- range $cr := $.Values.admissionPolicyEngine.internal.operationPolicies }}
+    {{- if gt (len $cr.spec.policies.allowedRepos) 0 }}
+      {{- include "allowed_repos_policy" . $cr }}
+    {{- end }}
+  {{- end }}}
+{{- end }}
+
+
+
+{{- define "allowed_repos_policy" }}
+  {{- $context := index . 0 }}
+  {{- $cr := index . 1 }}
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: D8AllowedRepos
+metadata:
+  name: {{$cr.metadata.name}}
+  {{- include "helm_lib_module_labels" (list $context (dict "security.deckhouse.io/operation-standard" "")) | nindent 2 }}
+spec:
+  enforcementAction: "deny"
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    {{- if $cr.spec.match.namespaceSelector }}
+      {{- if gt (len $cr.spec.match.namespaceSelector.matchNames) 0 }}
+    namespaces:
+      {{- $cr.spec.match.namespaceSelector.matchNames | toYaml | nindent 6 }}
+      {{- end }}
+      {{- if gt (len $cr.spec.match.namespaceSelector.excludeNames) 0 }}
+    excludedNamespaces:
+      {{- $cr.spec.match.namespaceSelector.excludeNames | toYaml | nindent 6 }}
+      {{- end }}
+      {{- if $cr.spec.match.namespaceSelector.labelSelector }}
+    namespaceSelector: {{ $cr.spec.match.namespaceSelector.labelSelector }}
+      {{- end }}
+    {{- end }}
+    {{- if $cr.spec.match.labelSelector }}
+    labelSelector: {{ $cr.spec.match.labelSelector }}
+    {{- end }}
+
+  parameters:
+    repos:
+      {{- $cr.spec.policies.allowedRepos | toYaml | nindent 6 }}
+{{- end }}
