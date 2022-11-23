@@ -17,8 +17,6 @@ limitations under the License.
 package hooks
 
 import (
-	"k8s.io/utils/pointer"
-
 	v1alpha1 "github.com/deckhouse/deckhouse/modules/015-admission-policy-engine/hooks/internal/apis"
 
 	"github.com/flant/addon-operator/pkg/module_manager/go_hook"
@@ -31,11 +29,10 @@ var _ = sdk.RegisterFunc(&go_hook.HookConfig{
 	OnAfterHelm: &go_hook.OrderedConfig{Order: 30},
 	Kubernetes: []go_hook.KubernetesConfig{
 		{
-			Name:                         "operation-policies",
-			ApiVersion:                   "deckhouse.io/v1alpha1",
-			Kind:                         "OperationPolicy",
-			ExecuteHookOnSynchronization: pointer.Bool(false),
-			FilterFunc:                   filterOP,
+			Name:       "operation-policies",
+			ApiVersion: "deckhouse.io/v1alpha1",
+			Kind:       "OperationPolicy",
+			FilterFunc: filterOP,
 		},
 	},
 }, handleOP)
