@@ -52,11 +52,13 @@ spec:
                       properties:
                         matchNames:
                           type: array
+                          default: []
                           description: "Include only a particular set of namespaces."
                           items:
                             type: string
                         excludeNames:
                           type: array
+                          default: []
                           description: "Include all namespaces except a particular set."
                           items:
                             type: string
