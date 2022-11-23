@@ -1,11 +1,10 @@
 {{- $context := . }}
 
----
 {{- range $cr := .Values.admissionPolicyEngine.internal.operationPolicies }}
   {{- if gt (len $cr.spec.policies.allowedRepos) 0 }}
-    {{- include "allowed_repos_policy" (list $context $cr) }}
+{{- include "allowed_repos_policy" (list $context $cr) }}
   {{- end }}
-{{- end }}}
+{{- end }}
 
 
 
@@ -40,7 +39,6 @@ spec:
     {{- if $cr.spec.match.labelSelector }}
     labelSelector: {{ $cr.spec.match.labelSelector }}
     {{- end }}
-
   parameters:
     repos:
       {{- $cr.spec.policies.allowedRepos | toYaml | nindent 6 }}
