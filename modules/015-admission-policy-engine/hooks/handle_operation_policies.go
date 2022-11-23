@@ -24,7 +24,7 @@ var _ = sdk.RegisterFunc(&go_hook.HookConfig{
 func handleOP(input *go_hook.HookInput) error {
 	snap := input.Snapshots["operation-policies"]
 
-	result := make([]*v1alpha1.OperationPolicy, 0, len(snap))
+	result := make([]*operationPolicy, 0, len(snap))
 
 	// if len(snap) == 0 {
 	// 	input.Values.Set("admissionPolicyEngine.internal.operationPolicies",result )
@@ -32,7 +32,7 @@ func handleOP(input *go_hook.HookInput) error {
 	// }
 
 	for _, sn := range snap {
-		op := sn.(*v1alpha1.OperationPolicy)
+		op := sn.(*operationPolicy)
 		result = append(result, op)
 	}
 
@@ -42,7 +42,7 @@ func handleOP(input *go_hook.HookInput) error {
 }
 
 func filterOP(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
-	var op v1alpha1.OperationPolicy
+	var op operationPolicy
 
 	err := sdk.FromUnstructured(obj, &op)
 	if err != nil {
@@ -50,4 +50,11 @@ func filterOP(obj *unstructured.Unstructured) (go_hook.FilterResult, error) {
 	}
 
 	return &op, nil
+}
+
+type operationPolicy struct {
+	Metadata struct {
+		Name string `json:"name"`
+	} `json:"metadata"`
+	Spec v1alpha1.OperationPolicySpec `json:"spec"`
 }
